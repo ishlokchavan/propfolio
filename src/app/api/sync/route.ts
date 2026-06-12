@@ -82,10 +82,12 @@ export async function POST(request: Request) {
 }
 
 // ── PHASE 1: search inbox, create job ──
-async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string; provider: string }) {
+async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string; provider: string; last_synced_at?: string | null }) {
+  // Incremental: after the first full scan, only fetch emails newer than last sync
+  const since: string | null = account.last_synced_at || null
   const messageIds = (account.provider === 'microsoft'
-    ? await searchOutlook(account.access_token)
-    : await searchGmail(account.access_token)
+    ? await searchOutlook(account.access_token, since)
+    : await searchGmail(account.access_token, since)
   ).slice(0, MAX_EMAILS)
 
   await supabase.from('email_accounts').update({ sync_status: 'syncing' }).eq('id', account.id)
@@ -109,7 +111,12 @@ async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, use
   return NextResponse.json({
     jobId: job.id,
     totalEmails: messageIds.length,
-    log: [{ message: `Found ${messageIds.length} developer-related emails`, type: 'found' }],
+    log: [{
+      message: since
+        ? `Found ${messageIds.length} new emails since last sync`
+        : `Found ${messageIds.length} developer-related emails`,
+      type: 'found',
+    }],
   })
 }
 
@@ -463,12 +470,13 @@ function isPdfEncrypted(base64Data: string): boolean {
 
 // ── Provider adapters ──
 
-async function searchGmail(token: string): Promise<string[]> {
+async function searchGmail(token: string, since?: string | null): Promise<string[]> {
   const ids: string[] = []
   let pageToken: string | undefined
   while (ids.length < MAX_EMAILS) {
     const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
-    url.searchParams.set('q', GMAIL_QUERY)
+    const sinceFilter = since ? ` after:${new Date(since).toISOString().slice(0, 10).replace(/-/g, '/')}` : ''
+    url.searchParams.set('q', `(${GMAIL_QUERY})${sinceFilter}`)
     url.searchParams.set('maxResults', '100')
     if (pageToken) url.searchParams.set('pageToken', pageToken)
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
@@ -481,10 +489,13 @@ async function searchGmail(token: string): Promise<string[]> {
   return ids
 }
 
-async function searchOutlook(token: string): Promise<string[]> {
+async function searchOutlook(token: string, since?: string | null): Promise<string[]> {
   const ids: string[] = []
+  const search = since
+    ? `(${GRAPH_SEARCH}) AND received>=${new Date(since).toISOString().slice(0, 10)}`
+    : GRAPH_SEARCH
   let url: string | null =
-    `https://graph.microsoft.com/v1.0/me/messages?$search=${encodeURIComponent(GRAPH_SEARCH)}&$top=100&$select=id`
+    `https://graph.microsoft.com/v1.0/me/messages?$search=${encodeURIComponent(search)}&$top=100&$select=id`
   while (url && ids.length < MAX_EMAILS) {
     const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     if (!res.ok) throw new Error(`Outlook search failed: ${res.status} ${(await res.text()).slice(0, 150)}`)
