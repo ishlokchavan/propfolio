@@ -77,6 +77,9 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
             </div>
           </div>
 
+          {/* Due payment alert */}
+          <DueAlert properties={properties} currency={currency} rates={rates} onSelect={setDetail} />
+
           {/* Resale eligibility strip */}
           <ResaleStrip properties={properties} onSelect={setDetail} />
 
@@ -332,5 +335,38 @@ function CashflowChart({ properties, currency, rates }: { properties: Property[]
         </p>
       )}
     </div>
+  )
+}
+
+function DueAlert({ properties, currency, rates, onSelect }: { properties: Property[]; currency: { primary: string; secondary: string }; rates: Record<string, number>; onSelect: (p: Property) => void }) {
+  const urgent = properties.flatMap(p =>
+    (p.payment_milestones || [])
+      .filter(m => m.status === 'due' && m.due_date && daysUntil(m.due_date) <= 14)
+      .map(m => ({ m, p, days: daysUntil(m.due_date!) }))
+  ).sort((a, b) => a.days - b.days)
+
+  if (urgent.length === 0) return null
+  const total = urgent.reduce((s, u) => s + u.m.amount, 0)
+
+  return (
+    <button
+      onClick={() => onSelect(urgent[0].p)}
+      className="w-full text-left mx-4 mt-3 p-4 rounded-2xl active:scale-98 transition-all"
+      style={{ width: 'calc(100% - 32px)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}
+    >
+      <div className="flex items-center gap-2 mb-1.5">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>
+          {urgent.length} payment{urgent.length > 1 ? 's' : ''} due within 14 days
+        </p>
+      </div>
+      <p className="text-[13px]" style={{ color: '#D4A853' }}>
+        {urgent[0].p.project_name} — {formatMoney(urgent[0].m.amount, currency.primary, rates)} {urgent[0].days <= 0 ? 'due today' : `in ${urgent[0].days}d`}
+        {urgent.length > 1 ? ` · ${formatMoney(total, currency.primary, rates)} total` : ''}
+      </p>
+    </button>
   )
 }
