@@ -1,0 +1,127 @@
+'use client'
+
+import { Property } from '@/lib/types'
+import { formatAED, paymentProgress, developerColor } from '@/lib/utils'
+
+interface Props {
+  property: Property
+  onBack: () => void
+}
+
+export default function PropertyDetail({ property: p, onBack }: Props) {
+  const progress = paymentProgress(p.paid_amount, p.total_value)
+  const milestones = [...(p.payment_milestones || [])].sort((a, b) => {
+    const order = { paid: 0, due: 1, future: 2 }
+    return order[a.status] - order[b.status]
+  })
+  const colorClass = developerColor(p.developer)
+
+  return (
+    <div className="h-full overflow-y-auto scroll-smooth">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3"
+        style={{ paddingTop: 'max(env(safe-area-inset-top, 12px), 16px)', borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={onBack}
+          className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 active:scale-90 transition-all"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9B9AB0" strokeWidth="2.5" strokeLinecap="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <h2 className="font-bold text-[17px] truncate" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+          {p.project_name}
+        </h2>
+      </div>
+
+      {/* Hero */}
+      <div className="mx-4 mt-4 p-5 rounded-2xl relative overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #1a1535 0%, #12122a 50%, #0d1a35 100%)', border: '1px solid rgba(124,111,237,0.2)' }}>
+        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-25"
+          style={{ background: 'radial-gradient(circle, #7C6FED, transparent 70%)' }} />
+        <div className={`h-0.5 rounded-full bg-gradient-to-r ${colorClass} mb-3`} />
+        <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: '#4A4960' }}>
+          {p.developer} · {p.location || p.emirate}
+        </p>
+        <p className="text-3xl font-bold mb-4" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+          <span className="text-base font-normal" style={{ color: '#6B6A7F' }}>AED </span>
+          {(p.total_value / 1_000_000).toFixed(2)}M
+        </p>
+        <div className="mb-3">
+          <div className="flex justify-between text-[11px] mb-1.5">
+            <span style={{ color: '#4A4960' }}>Payment progress</span>
+            <span className="font-bold" style={{ color: '#A78BFA' }}>{progress}%</span>
+          </div>
+          <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+            <div className="h-full rounded-full" style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #7C6FED, #A78BFA)' }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats grid */}
+      <div className="grid grid-cols-2 gap-2.5 mx-4 mt-3">
+        {[
+          { label: 'Paid', value: formatAED(p.paid_amount, true), color: '#10B981' },
+          { label: 'Remaining', value: formatAED(p.total_value - p.paid_amount, true), color: '#F59E0B' },
+          { label: 'Unit', value: p.unit_number || '—' },
+          { label: 'Handover', value: p.handover_date || '—' },
+        ].map(s => (
+          <div key={s.label} className="p-3.5 rounded-xl"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#4A4960' }}>{s.label}</p>
+            <p className="text-[17px] font-bold" style={{ color: s.color || '#F1F0FF', fontFamily: 'system-ui' }}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Payment timeline */}
+      <div className="mx-4 mt-4 mb-8">
+        <p className="text-[12px] font-semibold tracking-wider uppercase mb-3" style={{ color: '#6B6A7F' }}>
+          Payment Timeline
+        </p>
+        <div className="relative">
+          {/* Vertical line */}
+          <div className="absolute left-3 top-3 bottom-3 w-px" style={{ background: 'var(--border)' }} />
+
+          <div className="space-y-0">
+            {milestones.map((m, i) => {
+              const statusColor = m.status === 'paid' ? '#10B981' : m.status === 'due' ? '#F59E0B' : '#4A4960'
+              const date = m.due_date ? new Date(m.due_date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short', year: 'numeric' }) : m.due_label
+
+              return (
+                <div key={m.id} className="flex gap-4 pb-5 relative">
+                  {/* Dot */}
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center z-10"
+                    style={{ background: `${statusColor}20`, border: `1.5px solid ${statusColor}60` }}>
+                    {m.status === 'paid' ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={statusColor} strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : m.status === 'due' ? (
+                      <div className="w-2 h-2 rounded-full" style={{ background: statusColor }} />
+                    ) : (
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: statusColor }} />
+                    )}
+                  </div>
+
+                  <div className="flex-1 pb-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[13px] font-semibold" style={{ color: m.status === 'future' ? '#6B6A7F' : '#F1F0FF' }}>
+                          {m.label}
+                        </p>
+                        <p className="text-[11px] mt-0.5" style={{ color: '#4A4960' }}>{date || '—'}</p>
+                      </div>
+                      <p className="text-[14px] font-bold flex-shrink-0" style={{ color: statusColor, fontFamily: 'system-ui' }}>
+                        {formatAED(m.amount, true)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
