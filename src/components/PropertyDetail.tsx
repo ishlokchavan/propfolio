@@ -1,14 +1,16 @@
 'use client'
 
 import { Property } from '@/lib/types'
-import { formatAED, paymentProgress, developerColor, resaleStatus } from '@/lib/utils'
+import { formatAED, formatMoney, paymentProgress, developerColor, resaleStatus } from '@/lib/utils'
 
 interface Props {
   property: Property
   onBack: () => void
+  currency: { primary: string; secondary: string }
+  rates: Record<string, number>
 }
 
-export default function PropertyDetail({ property: p, onBack }: Props) {
+export default function PropertyDetail({ property: p, onBack, currency, rates }: Props) {
   const progress = paymentProgress(p.paid_amount, p.total_value)
   const milestones = [...(p.payment_milestones || [])].sort((a, b) => {
     const order = { paid: 0, due: 1, future: 2 }
@@ -44,10 +46,14 @@ export default function PropertyDetail({ property: p, onBack }: Props) {
         <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: '#4A4960' }}>
           {p.developer} · {p.location || p.emirate}
         </p>
-        <p className="text-3xl font-bold mb-4" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
-          <span className="text-base font-normal" style={{ color: '#6B6A7F' }}>AED </span>
-          {(p.total_value / 1_000_000).toFixed(2)}M
+        <p className="text-3xl font-bold mb-0.5" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+          {formatMoney(p.total_value, currency.primary, rates)}
         </p>
+        {currency.secondary !== 'none' && formatMoney(p.total_value, currency.secondary, rates) && (
+          <p className="text-[14px] font-medium mb-3" style={{ color: '#6B6A7F' }}>
+            ≈ {formatMoney(p.total_value, currency.secondary, rates)}
+          </p>
+        )}
         <div className="mb-3">
           <div className="flex justify-between text-[11px] mb-1.5">
             <span style={{ color: '#4A4960' }}>Payment progress</span>

@@ -2,6 +2,8 @@ export interface Profile {
   id: string
   full_name: string | null
   avatar_url: string | null
+  primary_currency: string | null
+  secondary_currency: string | null
   created_at: string
 }
 

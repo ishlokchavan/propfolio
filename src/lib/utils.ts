@@ -71,3 +71,39 @@ export function resaleStatus(paid: number, total: number, threshold: number | nu
   const amountToEligibility = eligible ? 0 : Math.ceil((threshold / 100) * total - paid)
   return { eligible, paidPct: Math.round(paidPct), threshold, amountToEligibility }
 }
+
+const CURRENCY_SYMBOLS: Record<string, string> = { AED: 'AED', INR: '\u20B9', USD: '$', GBP: '\u00A3', EUR: '\u20AC' }
+
+export function formatMoney(amountAED: number, currency: string, rates: Record<string, number>, compact = true): string {
+  const rate = currency === 'AED' ? 1 : (rates[currency] || 0)
+  if (rate === 0) return ''
+  const v = amountAED * rate
+  const sym = CURRENCY_SYMBOLS[currency] || currency
+  if (compact) {
+    if (currency === 'INR') {
+      if (v >= 1e7) return `${sym}${(v / 1e7).toFixed(2)} Cr`
+      if (v >= 1e5) return `${sym}${(v / 1e5).toFixed(1)} L`
+    }
+    if (v >= 1e6) return `${sym}${(v / 1e6).toFixed(2)}M`
+    if (v >= 1e3) return `${sym}${(v / 1e3).toFixed(0)}K`
+  }
+  return `${sym}${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+}
+
+export function cashflowByYear(milestones: Array<{ amount: number; due_date: string | null; due_label: string | null; status: string }>): Array<{ year: string; total: number }> {
+  const map = new Map<string, number>()
+  for (const m of milestones) {
+    if (m.status === 'paid') continue
+    let year: string | null = null
+    if (m.due_date) year = m.due_date.slice(0, 4)
+    else if (m.due_label) {
+      const match = m.due_label.match(/20\d{2}/)
+      if (match) year = match[0]
+    }
+    if (!year) year = 'TBD'
+    map.set(year, (map.get(year) || 0) + m.amount)
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([year, total]) => ({ year, total }))
+}

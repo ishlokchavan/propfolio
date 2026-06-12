@@ -64,6 +64,22 @@ export async function POST(request: Request) {
     .single()
 
   if (!account) return NextResponse.json({ error: 'Account not found' }, { status: 404 })
+
+  // Auto-refresh expired Google tokens using the stored refresh token
+  if (account.provider === 'google' && account.refresh_token) {
+    const expired = !account.token_expires_at || new Date(account.token_expires_at) < new Date(Date.now() + 5 * 60 * 1000)
+    if (expired && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+      const refreshed = await refreshGoogleToken(account.refresh_token)
+      if (refreshed) {
+        account.access_token = refreshed.access_token
+        await supabase.from('email_accounts').update({
+          access_token: refreshed.access_token,
+          token_expires_at: new Date(Date.now() + (refreshed.expires_in - 300) * 1000).toISOString(),
+        }).eq('id', account.id)
+      }
+    }
+  }
+
   if (!account.access_token) {
     return NextResponse.json({ error: 'token_expired', message: 'Email access expired. Sign out and back in to reconnect.' }, { status: 401 })
   }
@@ -465,6 +481,25 @@ function isPdfEncrypted(base64Data: string): boolean {
     return Buffer.from(base64Data, 'base64').includes('/Encrypt')
   } catch {
     return true // unreadable — treat as unusable
+  }
+}
+
+async function refreshGoogleToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
   }
 }
 

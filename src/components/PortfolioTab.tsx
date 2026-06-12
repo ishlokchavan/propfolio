@@ -2,20 +2,22 @@
 
 import { useState } from 'react'
 import { Property } from '@/lib/types'
-import { formatAED, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor, resaleStatus } from '@/lib/utils'
+import { formatAED, formatMoney, cashflowByYear, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor, resaleStatus } from '@/lib/utils'
 import PropertyDetail from './PropertyDetail'
 
 interface Props {
   properties: Property[]
   hasAccounts: boolean
   onConnectClick: () => void
+  currency: { primary: string; secondary: string }
+  rates: Record<string, number>
 }
 
-export default function PortfolioTab({ properties, hasAccounts, onConnectClick }: Props) {
+export default function PortfolioTab({ properties, hasAccounts, onConnectClick, currency, rates }: Props) {
   const [detail, setDetail] = useState<Property | null>(null)
 
   if (detail) {
-    return <PropertyDetail property={detail} onBack={() => setDetail(null)} />
+    return <PropertyDetail property={detail} onBack={() => setDetail(null)} currency={currency} rates={rates} />
   }
 
   const totalValue = properties.reduce((s, p) => s + p.total_value, 0)
@@ -60,10 +62,14 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick }
             <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: '#6B6A7F' }}>
               Total Portfolio Value
             </p>
-            <p className="text-4xl font-bold mb-4" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
-              <span className="text-lg font-normal" style={{ color: '#9B9AB0' }}>AED </span>
-              {(totalValue / 1_000_000).toFixed(2)}M
+            <p className="text-4xl font-bold mb-1" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+              {formatMoney(totalValue, currency.primary, rates)}
             </p>
+            {currency.secondary !== 'none' && formatMoney(totalValue, currency.secondary, rates) && (
+              <p className="text-[15px] font-medium mb-3" style={{ color: '#6B6A7F' }}>
+                ≈ {formatMoney(totalValue, currency.secondary, rates)}
+              </p>
+            )}
             <div className="flex gap-5 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <Stat label="Paid" value={formatAED(totalPaid, true)} color="#10B981" />
               <Stat label="Outstanding" value={formatAED(totalOutstanding, true)} color="#F59E0B" />
@@ -73,6 +79,9 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick }
 
           {/* Resale eligibility strip */}
           <ResaleStrip properties={properties} onSelect={setDetail} />
+
+          {/* Yearly cashflow projection */}
+          <CashflowChart properties={properties} currency={currency} rates={rates} />
 
           {/* Next due */}
           {nextDue && (
@@ -287,6 +296,41 @@ function ResaleStrip({ properties, onSelect }: { properties: Property[]; onSelec
       <p className="text-[11px] mt-2.5" style={{ color: '#4A4960' }}>
         Paid % has crossed the developer&apos;s NOC threshold — these units can be resold now.
       </p>
+    </div>
+  )
+}
+
+function CashflowChart({ properties, currency, rates }: { properties: Property[]; currency: { primary: string; secondary: string }; rates: Record<string, number> }) {
+  const all = properties.flatMap(p => p.payment_milestones || [])
+  const byYear = cashflowByYear(all)
+  if (byYear.length === 0) return null
+  const max = Math.max(...byYear.map(y => y.total))
+
+  return (
+    <div className="mx-4 mt-3 p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <p className="text-[12px] font-bold uppercase tracking-wider mb-3" style={{ color: '#6B6A7F' }}>
+        Upcoming Cashflow by Year
+      </p>
+      <div className="space-y-2.5">
+        {byYear.map(y => (
+          <div key={y.year} className="flex items-center gap-3">
+            <span className="text-[12px] font-bold w-9 flex-shrink-0" style={{ color: '#9B9AB0' }}>{y.year}</span>
+            <div className="flex-1 h-5 rounded-md relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <div className="h-full rounded-md transition-all duration-700"
+                style={{ width: `${Math.max(4, (y.total / max) * 100)}%`, background: 'linear-gradient(90deg, #7C6FED, #A78BFA)' }} />
+            </div>
+            <span className="text-[12px] font-bold flex-shrink-0 w-20 text-right" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+              {formatMoney(y.total, currency.primary, rates)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {currency.secondary !== 'none' && (
+        <p className="text-[11px] mt-3" style={{ color: '#4A4960' }}>
+          Total pending: {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.primary, rates)}
+          {' '}≈ {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.secondary, rates)}
+        </p>
+      )}
     </div>
   )
 }
