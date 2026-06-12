@@ -8,6 +8,7 @@ import PortfolioTab from './PortfolioTab'
 import PaymentsTab from './PaymentsTab'
 import ConnectTab from './ConnectTab'
 import SettingsTab from './SettingsTab'
+import InstallBanner from './InstallBanner'
 
 interface Props {
   user: User
@@ -106,6 +107,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
       className="flex flex-col lg:flex-row w-full lg:max-w-6xl mx-auto"
       style={{ height: '100dvh', background: 'var(--bg)', position: 'relative' }}
     >
+      <InstallBanner />
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 flex-shrink-0 px-4 py-8 gap-1"
         style={{ borderRight: '1px solid var(--border)' }}>
