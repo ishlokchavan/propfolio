@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
 
-const BATCH_SIZE = 8
+const BATCH_SIZE = 16
 const MAX_EMAILS = 200
 const MAX_PDFS_PER_BATCH = 2
 const MAX_PDF_BYTES = 4 * 1024 * 1024
@@ -133,19 +133,72 @@ async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, 
     return NextResponse.json({ done: true, progress: 100, propertiesFound: job.properties_found, log: [{ message: `Scan complete — ${job.properties_found} properties in portfolio`, type: 'found' }] })
   }
 
-  // Fetch emails + PDF attachments (provider-aware)
-  const { emails, pdfs } = account.provider === 'microsoft'
+  // Fetch emails (provider-aware); PDFs downloaded only for triage survivors
+  const allEmails = account.provider === 'microsoft'
     ? await fetchOutlookBatch(account.access_token, batch)
     : await fetchGmailBatch(account.access_token, batch)
 
-  // Skip password-protected PDFs (common for DAMAC SOAs) — they'd be rejected by the AI
-  const usablePdfs = pdfs.filter(p => !isPdfEncrypted(p.data))
-  const lockedCount = pdfs.length - usablePdfs.length
+  // STAGE 1 — Haiku triage: keep only ownership documents, discard marketing
+  let emails: EmailItem[]
+  try {
+    const keep = await triageEmails(allEmails)
+    emails = allEmails.filter((_, i) => keep[i])
+  } catch (err) {
+    const e = err as Error & { rateLimited?: boolean; retryAfter?: number }
+    if (e.rateLimited) {
+      return NextResponse.json({
+        done: false, rateLimited: true, retryAfter: e.retryAfter || 60,
+        progress: Math.min(99, Math.round((cursor / messageIds.length) * 100)),
+        propertiesFound: job.properties_found || 0,
+        log: [{ message: `AI rate limit — pausing ${e.retryAfter || 60}s, then continuing...`, type: 'info' }],
+      })
+    }
+    throw err
+  }
+
+  if (allEmails.length - emails.length > 0) {
+    log.push({ message: `Filtered out ${allEmails.length - emails.length} marketing emails`, type: 'info' })
+  }
+
+  // Nothing real in this batch — advance cursor cheaply, no heavyweight parse
+  if (emails.length === 0) {
+    const newCursorEmpty = cursor + batch.length
+    const progressEmpty = Math.min(99, Math.round((newCursorEmpty / messageIds.length) * 100))
+    await supabase.from('sync_jobs').update({
+      payload: { messageIds, cursor: newCursorEmpty }, progress: progressEmpty, status: 'parsing',
+    }).eq('id', jobId)
+    log.push({ message: `Processed ${Math.min(newCursorEmpty, messageIds.length)}/${messageIds.length} emails`, type: 'info' })
+    return NextResponse.json({ done: false, progress: progressEmpty, propertiesFound: job.properties_found || 0, log })
+  }
+
+  // STAGE 2 — download PDFs only for surviving emails
+  const usablePdfs: Array<{ name: string; data: string }> = []
+  let lockedCount = 0
+  for (const em of emails) {
+    if (usablePdfs.length >= MAX_PDFS_PER_BATCH) break
+    if (account.provider === 'microsoft') {
+      if (em.pdfRefs.length > 0) {
+        const got = await downloadOutlookPdfs(account.access_token, em.pdfRefs[0].msgId, MAX_PDFS_PER_BATCH - usablePdfs.length)
+        for (const pdf of got) {
+          if (isPdfEncrypted(pdf.data)) { lockedCount++; continue }
+          usablePdfs.push(pdf)
+        }
+      }
+    } else {
+      for (const ref of em.pdfRefs) {
+        if (usablePdfs.length >= MAX_PDFS_PER_BATCH) break
+        const pdf = await downloadGmailPdf(account.access_token, ref)
+        if (!pdf) continue
+        if (isPdfEncrypted(pdf.data)) { lockedCount++; continue }
+        usablePdfs.push(pdf)
+      }
+    }
+  }
   if (lockedCount > 0) {
     log.push({ message: `Skipped ${lockedCount} password-protected PDF${lockedCount > 1 ? 's' : ''}`, type: 'info' })
   }
 
-  // Parse with Claude — text digest + PDF documents
+  // STAGE 3 — Sonnet extraction on real documents only
   let parsed: ParsedProperty[]
   try {
     parsed = await parseWithClaude(emails, usablePdfs)
@@ -202,6 +255,58 @@ async function finishJob(supabase: Awaited<ReturnType<typeof createClient>>, job
     last_synced_at: new Date().toISOString(),
     emails_scanned: job.emails_scanned,
   }).eq('id', accountId)
+}
+
+
+// ── Stage 1: cheap fast triage with Haiku ──
+async function triageEmails(emails: EmailItem[]): Promise<boolean[]> {
+  if (emails.length === 0) return []
+  const digest = emails.map((e, i) =>
+    `${i + 1}. From: ${e.from} | Subject: ${e.subject} | Snippet: ${e.body.slice(0, 200)}`
+  ).join('\n')
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `These are emails from a UAE property buyer's inbox. Which are OWNERSHIP documents (booking confirmations, SPAs, payment plans, payment receipts/reminders, statements of account, handover notices for a SPECIFIC purchased unit)? Marketing, newsletters, launch announcements, price lists are NOT.
+
+Respond ONLY with a JSON array of the numbers that ARE ownership documents, e.g. [2,5,9]. If none: []
+
+${digest}`,
+      }],
+    }),
+  })
+
+  if (!res.ok) {
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10)
+      const e = new Error('rate_limited') as Error & { rateLimited: boolean; retryAfter: number }
+      e.rateLimited = true
+      e.retryAfter = Math.min(Math.max(retryAfter, 15), 90)
+      throw e
+    }
+    // Triage failure should never block the pipeline — treat all as relevant
+    return emails.map(() => true)
+  }
+
+  const data = await res.json()
+  const raw = (data.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('').trim()
+  try {
+    const nums: number[] = JSON.parse(raw.replace(/```json|```/g, ''))
+    const set = new Set(nums)
+    return emails.map((_, i) => set.has(i + 1))
+  } catch {
+    return emails.map(() => true)
+  }
 }
 
 // ── Claude parsing with PDF support ──
@@ -390,42 +495,48 @@ async function searchOutlook(token: string): Promise<string[]> {
   return ids
 }
 
-async function fetchGmailBatch(token: string, batch: string[]) {
-  const emails: Array<{ subject: string; from: string; date: string; body: string }> = []
-  const pdfs: Array<{ name: string; data: string }> = []
+interface EmailItem {
+  subject: string
+  from: string
+  date: string
+  body: string
+  pdfRefs: Array<{ msgId: string; attachmentId: string; filename: string; size: number }>
+}
 
+async function fetchGmailBatch(token: string, batch: string[]): Promise<EmailItem[]> {
   const results = await Promise.all(batch.map(async (id) => {
     const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
       { headers: { Authorization: `Bearer ${token}` } })
     return res.ok ? res.json() : null
   }))
 
+  const emails: EmailItem[] = []
   for (const msg of results) {
     if (!msg) continue
     const headers = msg.payload?.headers || []
     const h = (n: string) => headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())?.value || ''
-    emails.push({ subject: h('Subject'), from: h('From'), date: h('Date'), body: extractBody(msg.payload).slice(0, 2000) })
-
-    if (pdfs.length < MAX_PDFS_PER_BATCH) {
-      for (const att of findPdfParts(msg.payload)) {
-        if (pdfs.length >= MAX_PDFS_PER_BATCH) break
-        if (att.size > MAX_PDF_BYTES) continue
-        const attRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}/attachments/${att.attachmentId}`,
-          { headers: { Authorization: `Bearer ${token}` } })
-        if (!attRes.ok) continue
-        const attData = await attRes.json()
-        if (attData.data) pdfs.push({ name: att.filename, data: attData.data.replace(/-/g, '+').replace(/_/g, '/') })
-      }
-    }
+    emails.push({
+      subject: h('Subject'), from: h('From'), date: h('Date'),
+      body: extractBody(msg.payload).slice(0, 2000),
+      pdfRefs: findPdfParts(msg.payload)
+        .filter(a => a.size <= MAX_PDF_BYTES)
+        .map(a => ({ msgId: msg.id, attachmentId: a.attachmentId, filename: a.filename, size: a.size })),
+    })
   }
-  return { emails, pdfs }
+  return emails
 }
 
-async function fetchOutlookBatch(token: string, batch: string[]) {
-  const emails: Array<{ subject: string; from: string; date: string; body: string }> = []
-  const pdfs: Array<{ name: string; data: string }> = []
+async function downloadGmailPdf(token: string, ref: { msgId: string; attachmentId: string; filename: string }) {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${ref.msgId}/attachments/${ref.attachmentId}`,
+    { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return null
+  const data = await res.json()
+  if (!data.data) return null
+  return { name: ref.filename, data: data.data.replace(/-/g, '+').replace(/_/g, '/') }
+}
 
+async function fetchOutlookBatch(token: string, batch: string[]): Promise<EmailItem[]> {
   const results = await Promise.all(batch.map(async (id) => {
     const res = await fetch(
       `https://graph.microsoft.com/v1.0/me/messages/${id}?$select=subject,from,receivedDateTime,body,hasAttachments`,
@@ -433,6 +544,7 @@ async function fetchOutlookBatch(token: string, batch: string[]) {
     return res.ok ? res.json() : null
   }))
 
+  const emails: EmailItem[] = []
   for (const msg of results) {
     if (!msg) continue
     const bodyText = msg.body?.contentType === 'html' ? stripHtml(msg.body.content || '') : (msg.body?.content || '')
@@ -441,22 +553,25 @@ async function fetchOutlookBatch(token: string, batch: string[]) {
       from: msg.from?.emailAddress?.address || '',
       date: msg.receivedDateTime || '',
       body: bodyText.slice(0, 2000),
+      pdfRefs: msg.hasAttachments ? [{ msgId: msg.id, attachmentId: '', filename: '', size: 0 }] : [],
     })
+  }
+  return emails
+}
 
-    if (msg.hasAttachments && pdfs.length < MAX_PDFS_PER_BATCH) {
-      const attRes = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${msg.id}/attachments`,
-        { headers: { Authorization: `Bearer ${token}` } })
-      if (!attRes.ok) continue
-      const attData = await attRes.json()
-      for (const att of attData.value || []) {
-        if (pdfs.length >= MAX_PDFS_PER_BATCH) break
-        if (att.contentType === 'application/pdf' && att.contentBytes && (att.size || 0) <= MAX_PDF_BYTES) {
-          pdfs.push({ name: att.name, data: att.contentBytes })
-        }
-      }
+async function downloadOutlookPdfs(token: string, msgId: string, max: number) {
+  const out: Array<{ name: string; data: string }> = []
+  const res = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${msgId}/attachments`,
+    { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return out
+  const data = await res.json()
+  for (const att of data.value || []) {
+    if (out.length >= max) break
+    if (att.contentType === 'application/pdf' && att.contentBytes && (att.size || 0) <= MAX_PDF_BYTES) {
+      out.push({ name: att.name, data: att.contentBytes })
     }
   }
-  return { emails, pdfs }
+  return out
 }
 
 // ── Gmail helpers ──
