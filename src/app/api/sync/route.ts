@@ -17,6 +17,9 @@ const GMAIL_QUERY = [
   'OR subject:("payment plan" OR "booking confirmation" OR "statement of account"',
   'OR "SPA" OR "sales purchase agreement" OR "payment reminder" OR "payment receipt"',
   'OR "installment" OR "handover" OR "oqood" OR "unit reservation" OR "payment received")',
+  // Full-text terms so FORWARDED developer emails (sender lost) still match on body content
+  'OR "statement of account" OR "payment plan" OR "booking confirmation"',
+  'OR "sales purchase agreement" OR "oqood" OR "unit reservation"',
 ].join(' ')
 
 const GRAPH_SEARCH = '"payment plan" OR "booking confirmation" OR "statement of account" OR "payment receipt" OR installment OR handover OR oqood OR damac OR emaar OR sobha OR arada OR nakheel OR aldar'
