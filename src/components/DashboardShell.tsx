@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 import { Property, EmailAccount, Profile, PaymentMilestone } from '@/lib/types'
 import PortfolioTab from './PortfolioTab'
 import PaymentsTab from './PaymentsTab'
@@ -20,8 +21,53 @@ export default function DashboardShell({ user, profile, properties, emailAccount
   const [activeTab, setActiveTab] = useState<Tab>('portfolio')
   const [localProperties, setLocalProperties] = useState(properties)
   const [localAccounts, setLocalAccounts] = useState(emailAccounts)
+  const supabase = createClient()
 
   const hasData = localProperties.length > 0
+
+  // Fallback: capture the Gmail/Outlook provider token client-side.
+  // Supabase keeps provider_token in the stored session right after OAuth —
+  // this catches it even if the server callback missed the write.
+  useEffect(() => {
+    async function captureProviderToken() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.provider_token || !session.user.email) return
+
+      const provider = session.user.app_metadata.provider === 'azure' ? 'microsoft' : 'google'
+      const { data: upserted, error } = await supabase
+        .from('email_accounts')
+        .upsert(
+          {
+            user_id: session.user.id,
+            provider,
+            email: session.user.email,
+            access_token: session.provider_token,
+            refresh_token: session.provider_refresh_token || null,
+            token_expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+            sync_status: 'pending',
+          },
+          { onConflict: 'user_id,email' }
+        )
+        .select()
+        .single()
+
+      if (!error && upserted) {
+        setLocalAccounts(prev => {
+          if (prev.some(a => a.id === upserted.id)) {
+            return prev.map(a => a.id === upserted.id ? upserted : a)
+          }
+          return [...prev, upserted]
+        })
+      }
+    }
+    captureProviderToken()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 
   return (
     <div
@@ -53,6 +99,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
             onAccountAdded={(acc) => setLocalAccounts(prev => [...prev, acc])}
             onAccountRemoved={(id) => setLocalAccounts(prev => prev.filter(a => a.id !== id))}
             onPropertiesFound={(props) => setLocalProperties(prev => [...prev, ...props])}
+            onSignOut={signOut}
           />
         </div>
       </div>

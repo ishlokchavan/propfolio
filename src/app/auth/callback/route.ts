@@ -11,15 +11,15 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && data.session) {
-      // Capture the Google/Microsoft provider token for email scanning
       const { session, user } = data
       const providerToken = session.provider_token
       const providerRefreshToken = session.provider_refresh_token
       const provider = user.app_metadata.provider === 'azure' ? 'microsoft' : 'google'
 
+      console.log('[auth/callback] user:', user.email, 'provider:', provider, 'has_token:', !!providerToken, 'has_refresh:', !!providerRefreshToken)
+
       if (providerToken && user.email) {
-        // Store/update the email account with tokens for Gmail/Outlook API access
-        await supabase.from('email_accounts').upsert(
+        const { error: upsertError } = await supabase.from('email_accounts').upsert(
           {
             user_id: user.id,
             provider,
@@ -31,10 +31,18 @@ export async function GET(request: Request) {
           },
           { onConflict: 'user_id,email' }
         )
+        if (upsertError) {
+          console.error('[auth/callback] email_accounts upsert failed:', upsertError.message)
+        } else {
+          console.log('[auth/callback] email account stored for', user.email)
+        }
+      } else {
+        console.warn('[auth/callback] no provider_token in session — Gmail scope may not have been granted')
       }
 
       return NextResponse.redirect(`${origin}${next}`)
     }
+    console.error('[auth/callback] exchange failed:', error?.message)
   }
 
   return NextResponse.redirect(`${origin}/?error=auth`)

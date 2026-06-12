@@ -11,11 +11,12 @@ interface Props {
   onAccountAdded: (acc: EmailAccount) => void
   onAccountRemoved: (id: string) => void
   onPropertiesFound: (props: Property[]) => void
+  onSignOut: () => void
 }
 
 type SyncState = 'idle' | 'syncing' | 'done' | 'error'
 
-export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRemoved, onPropertiesFound }: Props) {
+export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRemoved, onPropertiesFound, onSignOut }: Props) {
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const [syncLog, setSyncLog] = useState<Array<{ text: string; type: string }>>([])
   const [connecting, setConnecting] = useState<'google' | 'microsoft' | null>(null)
@@ -224,9 +225,28 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
         </button>
       </div>
 
-      <p className="text-center text-[11px] pb-6 mx-8" style={{ color: '#4A4960' }}>
+      <p className="text-center text-[11px] pb-4 mx-8" style={{ color: '#4A4960' }}>
         Read-only access · We never send emails on your behalf · You can disconnect anytime
       </p>
+
+      {/* Account footer */}
+      <div className="mx-4 mb-8 p-4 rounded-2xl flex items-center justify-between"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <div className="min-w-0 flex-1 pr-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: '#4A4960' }}>Signed in as</p>
+          <p className="text-[13px] font-medium truncate mt-0.5" style={{ color: '#9B9AB0' }}>{user.email}</p>
+        </div>
+        <button
+          onClick={onSignOut}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-semibold flex-shrink-0 active:scale-95 transition-all"
+          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Sign out
+        </button>
+      </div>
     </div>
   )
 }
