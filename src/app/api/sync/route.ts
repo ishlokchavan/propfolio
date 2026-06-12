@@ -138,8 +138,15 @@ async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, 
     ? await fetchOutlookBatch(account.access_token, batch)
     : await fetchGmailBatch(account.access_token, batch)
 
+  // Skip password-protected PDFs (common for DAMAC SOAs) — they'd be rejected by the AI
+  const usablePdfs = pdfs.filter(p => !isPdfEncrypted(p.data))
+  const lockedCount = pdfs.length - usablePdfs.length
+  if (lockedCount > 0) {
+    log.push({ message: `Skipped ${lockedCount} password-protected PDF${lockedCount > 1 ? 's' : ''}`, type: 'info' })
+  }
+
   // Parse with Claude — text digest + PDF documents
-  const parsed = await parseWithClaude(emails, pdfs)
+  const parsed = await parseWithClaude(emails, usablePdfs)
   const accepted = parsed.filter(p => p.confidence >= 0.5 && p.total_value > 0)
 
   // Merge into DB
@@ -165,7 +172,7 @@ async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, 
     status: 'parsing',
   }).eq('id', jobId)
 
-  if (pdfs.length > 0) log.push({ message: `Read ${pdfs.length} PDF attachment${pdfs.length > 1 ? 's' : ''}`, type: 'processing' })
+  if (usablePdfs.length > 0) log.push({ message: `Read ${usablePdfs.length} PDF attachment${usablePdfs.length > 1 ? 's' : ''}`, type: 'processing' })
   log.push({ message: `Processed ${Math.min(newCursor, messageIds.length)}/${messageIds.length} emails`, type: 'info' })
 
   return NextResponse.json({ done: false, progress, propertiesFound: totalFound, log })
@@ -237,7 +244,14 @@ ${digest}`,
     }),
   })
 
-  if (!res.ok) throw new Error(`AI parsing failed: ${res.status} ${(await res.text()).slice(0, 150)}`)
+  if (!res.ok) {
+    const errText = await res.text()
+    // A bad/locked PDF slipped through — retry this batch without attachments rather than failing
+    if (res.status === 400 && pdfs.length > 0 && /pdf/i.test(errText)) {
+      return parseWithClaude(emails, [])
+    }
+    throw new Error(`AI parsing failed: ${res.status} ${errText.slice(0, 150)}`)
+  }
   const data = await res.json()
   const raw = (data.content || [])
     .filter((b: { type: string }) => b.type === 'text')
@@ -309,6 +323,14 @@ async function mergeProperty(
   return 'inserted'
 }
 
+
+function isPdfEncrypted(base64Data: string): boolean {
+  try {
+    return Buffer.from(base64Data, 'base64').includes('/Encrypt')
+  } catch {
+    return true // unreadable — treat as unusable
+  }
+}
 
 // ── Provider adapters ──
 
