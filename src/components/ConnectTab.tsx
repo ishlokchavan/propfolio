@@ -96,7 +96,7 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
       // Phase 2: process batches until done
       let totalFound = 0
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < 120; i++) {
         const res = await fetch('/api/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -111,6 +111,9 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
         if (data.log) pushLog(data.log)
         totalFound = data.propertiesFound ?? totalFound
         if (data.done) break
+        if (data.rateLimited) {
+          await new Promise(r => setTimeout(r, (data.retryAfter || 60) * 1000))
+        }
       }
 
       setSyncState('done')

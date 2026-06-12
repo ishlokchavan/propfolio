@@ -3,9 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
 
-const BATCH_SIZE = 12
+const BATCH_SIZE = 8
 const MAX_EMAILS = 200
-const MAX_PDFS_PER_BATCH = 5
+const MAX_PDFS_PER_BATCH = 2
 const MAX_PDF_BYTES = 4 * 1024 * 1024
 
 const GMAIL_QUERY = [
@@ -146,7 +146,24 @@ async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, 
   }
 
   // Parse with Claude — text digest + PDF documents
-  const parsed = await parseWithClaude(emails, usablePdfs)
+  let parsed: ParsedProperty[]
+  try {
+    parsed = await parseWithClaude(emails, usablePdfs)
+  } catch (err) {
+    const e = err as Error & { rateLimited?: boolean; retryAfter?: number }
+    if (e.rateLimited) {
+      // Cursor NOT advanced — client waits and retries this same batch
+      return NextResponse.json({
+        done: false,
+        rateLimited: true,
+        retryAfter: e.retryAfter || 60,
+        progress: Math.min(99, Math.round((cursor / messageIds.length) * 100)),
+        propertiesFound: job.properties_found || 0,
+        log: [{ message: `AI rate limit — pausing ${e.retryAfter || 60}s, then continuing...`, type: 'info' }],
+      })
+    }
+    throw err
+  }
   const accepted = parsed.filter(p => p.confidence >= 0.5 && p.total_value > 0)
 
   // Merge into DB
@@ -249,6 +266,13 @@ ${digest}`,
     // A bad/locked PDF slipped through — retry this batch without attachments rather than failing
     if (res.status === 400 && pdfs.length > 0 && /pdf/i.test(errText)) {
       return parseWithClaude(emails, [])
+    }
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10)
+      const e = new Error('rate_limited') as Error & { rateLimited: boolean; retryAfter: number }
+      e.rateLimited = true
+      e.retryAfter = Math.min(Math.max(retryAfter, 15), 90)
+      throw e
     }
     throw new Error(`AI parsing failed: ${res.status} ${errText.slice(0, 150)}`)
   }
@@ -380,7 +404,7 @@ async function fetchGmailBatch(token: string, batch: string[]) {
     if (!msg) continue
     const headers = msg.payload?.headers || []
     const h = (n: string) => headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())?.value || ''
-    emails.push({ subject: h('Subject'), from: h('From'), date: h('Date'), body: extractBody(msg.payload).slice(0, 2500) })
+    emails.push({ subject: h('Subject'), from: h('From'), date: h('Date'), body: extractBody(msg.payload).slice(0, 2000) })
 
     if (pdfs.length < MAX_PDFS_PER_BATCH) {
       for (const att of findPdfParts(msg.payload)) {
@@ -416,7 +440,7 @@ async function fetchOutlookBatch(token: string, batch: string[]) {
       subject: msg.subject || '',
       from: msg.from?.emailAddress?.address || '',
       date: msg.receivedDateTime || '',
-      body: bodyText.slice(0, 2500),
+      body: bodyText.slice(0, 2000),
     })
 
     if (msg.hasAttachments && pdfs.length < MAX_PDFS_PER_BATCH) {
