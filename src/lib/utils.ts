@@ -107,3 +107,47 @@ export function cashflowByYear(milestones: Array<{ amount: number; due_date: str
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([year, total]) => ({ year, total }))
 }
+
+export type CashflowGranularity = 'month' | 'quarter' | 'year'
+
+export function cashflowBuckets(
+  milestones: Array<{ amount: number; due_date: string | null; due_label: string | null; status: string }>,
+  granularity: CashflowGranularity
+): Array<{ label: string; total: number }> {
+  const map = new Map<string, number>()
+  const order: string[] = []
+  const add = (key: string, amt: number) => {
+    if (!map.has(key)) order.push(key)
+    map.set(key, (map.get(key) || 0) + amt)
+  }
+  for (const m of milestones) {
+    if (m.status === 'paid') continue
+    if (m.due_date) {
+      const d = new Date(m.due_date)
+      if (granularity === 'month') add(d.toLocaleDateString('en-AE', { month: 'short', year: '2-digit' }), m.amount)
+      else if (granularity === 'quarter') add(`Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`, m.amount)
+      else add(String(d.getFullYear()), m.amount)
+    } else {
+      const match = m.due_label?.match(/20\d{2}/)
+      add(granularity === 'year' && match ? match[0] : (match ? `TBD ${match[0]}` : 'TBD'), m.amount)
+    }
+  }
+  // Keep chronological-ish order: dated keys are added in milestone order; sort dated by parse where possible
+  return order.map(label => ({ label, total: map.get(label)! }))
+}
+
+export function monthsUntilHandover(label: string | null): number | null {
+  if (!label) return null
+  const yearMatch = label.match(/20\d{2}/)
+  if (!yearMatch) return null
+  const year = Number(yearMatch[0])
+  let month = 6
+  const q = label.match(/Q([1-4])/i)
+  const monthNames = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+  const mn = monthNames.findIndex(m => label.toLowerCase().includes(m))
+  if (q) month = (Number(q[1]) - 1) * 3 + 2
+  else if (mn >= 0) month = mn
+  const target = new Date(year, month, 15)
+  const now = new Date()
+  return Math.max(0, Math.round((target.getTime() - now.getTime()) / (1000 * 3600 * 24 * 30.4)))
+}

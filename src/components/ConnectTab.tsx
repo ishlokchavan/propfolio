@@ -12,11 +12,12 @@ interface Props {
   onAccountRemoved: (id: string) => void
   onPropertiesFound: (props: Property[]) => void
   onSignOut: () => void
+  compact?: boolean
 }
 
 type SyncState = 'idle' | 'syncing' | 'done' | 'error'
 
-export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRemoved, onPropertiesFound, onSignOut }: Props) {
+export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRemoved, onPropertiesFound, onSignOut, compact }: Props) {
   const [syncState, setSyncState] = useState<SyncState>('idle')
   const [syncLog, setSyncLog] = useState<Array<{ text: string; type: string }>>([])
   const [connecting, setConnecting] = useState<'google' | 'microsoft' | null>(null)
@@ -131,14 +132,14 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
   const hasAccounts = accounts.length > 0
 
   return (
-    <div className="h-full overflow-y-auto scroll-smooth">
-      <div className="px-5" style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}>
+    <div className={compact ? '' : 'h-full overflow-y-auto scroll-smooth'}>
+      {!compact && <div className="px-5" style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}>
         <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--accent2)' }}>Email Sync</p>
         <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>Connect</h1>
         <p className="text-sm mb-5" style={{ color: 'var(--text3)' }}>
           Add the email{hasAccounts ? 's' : ''} you registered with your developers
         </p>
-      </div>
+      </div>}
 
       {/* Connected accounts */}
       {hasAccounts && (
@@ -258,6 +259,7 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
         Read-only access · We never send emails on your behalf · You can disconnect anytime
       </p>
 
+      {compact ? null : <>
       {/* Account footer */}
       <div className="mx-4 mb-8 p-4 rounded-2xl flex items-center justify-between"
         style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -276,6 +278,7 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
           Sign out
         </button>
       </div>
+      </>}
     </div>
   )
 }

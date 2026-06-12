@@ -11,11 +11,12 @@ interface Props {
   onSignOut: () => void
   onCurrencyChange: (primary: string, secondary: string) => void
   waSummary: string
+  emailSection: React.ReactNode
 }
 
 const CURRENCIES = ['AED', 'INR', 'USD', 'GBP', 'EUR']
 
-export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange, waSummary }: Props) {
+export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange, waSummary, emailSection }: Props) {
   const [primary, setPrimary] = useState(profile?.primary_currency || 'AED')
   const [secondary, setSecondary] = useState(profile?.secondary_currency || 'INR')
   const [saving, setSaving] = useState(false)
@@ -119,6 +120,15 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
           </p>
           <p className="text-[13px] truncate" style={{ color: 'var(--text3)' }}>{user.email}</p>
         </div>
+      </div>
+
+      {/* Connected emails */}
+      <div className="mx-4 mb-4 p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text3)' }}>Connected Emails</p>
+        <p className="text-[12px] mb-2" style={{ color: 'var(--text4)' }}>
+          We scan these inboxes to keep your portfolio in sync.
+        </p>
+        {emailSection}
       </div>
 
       {/* Currency */}

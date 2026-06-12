@@ -83,8 +83,6 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
           {/* Resale eligibility strip */}
           <ResaleStrip properties={properties} onSelect={setDetail} />
 
-          {/* Yearly cashflow projection */}
-          <CashflowChart properties={properties} currency={currency} rates={rates} />
 
           {/* Next due */}
           {nextDue && (
@@ -145,62 +143,75 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
   const nextMilestone = (p.payment_milestones || [])
     .filter(m => m.status === 'due' && m.due_date)
     .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())[0]
-
   const colorClass = developerColor(p.developer)
+  const resale = resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)
 
   return (
     <button
       onClick={onClick}
-      className="w-full h-full text-left rounded-2xl p-4 transition-all active:scale-98 hover:translate-y-[-2px]"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+      className="w-full h-full text-left rounded-[20px] p-5 transition-all active:scale-[0.985] hover:translate-y-[-2px]"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
     >
-      {/* Dev color bar */}
-      <div className={`h-0.5 rounded-full bg-gradient-to-r ${colorClass} mb-3`} />
-
-      <div className="flex items-start justify-between mb-1">
-        <h3 className="font-semibold text-[15px] leading-tight pr-2" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
-          {p.project_name}
-        </h3>
-        <span className="flex items-center gap-1.5 flex-shrink-0">
-          {resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)?.eligible && (
-            <span className="text-[10px] font-bold px-2 py-1 rounded-full"
-              style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--green)' }}>
-              Resale ✓
-            </span>
-          )}
-          <span className="text-[10px] font-semibold px-2 py-1 rounded-full"
-            style={{ background: 'rgba(124,111,237,0.15)', color: 'var(--accent2)' }}>
-            {p.property_type || 'Unit'}
+      {/* Identity row */}
+      <div className="flex items-start gap-3 mb-4">
+        <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${colorClass} flex items-center justify-center flex-shrink-0`}>
+          <span className="text-white font-bold text-[15px]">{p.developer[0]}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-[16px] leading-snug truncate" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
+            {p.project_name}
+          </h3>
+          <p className="text-[12px] mt-0.5 truncate" style={{ color: 'var(--text4)' }}>
+            {p.developer} · {p.location || p.emirate}{p.property_type ? ` · ${p.property_type}` : ''}
+          </p>
+        </div>
+        {resale?.eligible && (
+          <span className="text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 mt-0.5"
+            style={{ background: 'color-mix(in srgb, var(--green) 14%, transparent)', color: 'var(--green)' }}>
+            Resale ✓
           </span>
-        </span>
+        )}
       </div>
 
-      <p className="text-[12px] mb-3 font-medium" style={{ color: 'var(--text4)' }}>
-        {p.developer} · {p.location || p.emirate}
-        {p.unit_number && ` · ${p.unit_number}`}
-      </p>
-
-      {/* Progress */}
-      <div className="mb-3">
-        <div className="flex justify-between text-[11px] mb-1.5">
-          <span style={{ color: 'var(--text4)' }}>Payment progress</span>
-          <span className="font-semibold" style={{ color: 'var(--accent2)' }}>{progress}%</span>
-        </div>
-        <div className="h-1 rounded-full" style={{ background: 'var(--track)' }}>
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }}
-          />
-        </div>
+      {/* Value + progress */}
+      <div className="flex items-baseline justify-between mb-1.5">
+        <p className="text-[22px] font-bold" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
+          {formatAED(p.total_value, true)}
+        </p>
+        <p className="text-[12px] font-bold" style={{ color: 'var(--accent2)' }}>{progress}% paid</p>
+      </div>
+      <div className="h-[5px] rounded-full mb-4" style={{ background: 'var(--track)' }}>
+        <div className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }} />
       </div>
 
-      {/* Financials */}
-      <div className="flex gap-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
-        <MiniStat label="Total" value={formatAED(p.total_value, true)} />
-        <MiniStat label="Next due" value={nextMilestone ? formatAED(nextMilestone.amount, true) : '—'} highlight />
-        <MiniStat label="Due date" value={nextMilestone?.due_date
-          ? new Date(nextMilestone.due_date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short' })
-          : (nextMilestone?.due_label || '—')} />
+      {/* Footer chips */}
+      <div className="flex gap-2">
+        {nextMilestone ? (
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl min-w-0"
+            style={{ background: 'color-mix(in srgb, var(--gold) 9%, transparent)' }}>
+            <svg width="13" height="13" className="flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <div className="min-w-0">
+              <p className="text-[12px] font-bold truncate" style={{ color: 'var(--gold)' }}>
+                {formatAED(nextMilestone.amount, true)}
+              </p>
+              <p className="text-[10px] truncate" style={{ color: 'var(--text4)' }}>
+                due {new Date(nextMilestone.due_date!).toLocaleDateString('en-AE', { day: 'numeric', month: 'short' })}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
+            <p className="text-[12px] font-bold" style={{ color: 'var(--text3)' }}>No payment due</p>
+            <p className="text-[10px]" style={{ color: 'var(--text4)' }}>all caught up</p>
+          </div>
+        )}
+        <div className="flex-1 px-3 py-2 rounded-xl min-w-0" style={{ background: 'var(--surface2)' }}>
+          <p className="text-[12px] font-bold truncate" style={{ color: 'var(--text2)' }}>{p.handover_date || 'TBD'}</p>
+          <p className="text-[10px]" style={{ color: 'var(--text4)' }}>handover</p>
+        </div>
       </div>
     </button>
   )
@@ -301,41 +312,6 @@ function ResaleStrip({ properties, onSelect }: { properties: Property[]; onSelec
       <p className="text-[11px] mt-2.5" style={{ color: 'var(--text4)' }}>
         Paid % has crossed the developer&apos;s NOC threshold — these units can be resold now.
       </p>
-    </div>
-  )
-}
-
-function CashflowChart({ properties, currency, rates }: { properties: Property[]; currency: { primary: string; secondary: string }; rates: Record<string, number> }) {
-  const all = properties.flatMap(p => p.payment_milestones || [])
-  const byYear = cashflowByYear(all)
-  if (byYear.length === 0) return null
-  const max = Math.max(...byYear.map(y => y.total))
-
-  return (
-    <div className="mx-4 mt-3 p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p className="text-[12px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text3)' }}>
-        Upcoming Cashflow by Year
-      </p>
-      <div className="space-y-2.5">
-        {byYear.map(y => (
-          <div key={y.year} className="flex items-center gap-3">
-            <span className="text-[12px] font-bold w-9 flex-shrink-0" style={{ color: 'var(--text2)' }}>{y.year}</span>
-            <div className="flex-1 h-5 rounded-md relative overflow-hidden" style={{ background: 'var(--track)' }}>
-              <div className="h-full rounded-md transition-all duration-700"
-                style={{ width: `${Math.max(4, (y.total / max) * 100)}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }} />
-            </div>
-            <span className="text-[12px] font-bold flex-shrink-0 w-20 text-right" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
-              {formatMoney(y.total, currency.primary, rates)}
-            </span>
-          </div>
-        ))}
-      </div>
-      {currency.secondary !== 'none' && (
-        <p className="text-[11px] mt-3" style={{ color: 'var(--text4)' }}>
-          Total pending: {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.primary, rates)}
-          {' '}≈ {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.secondary, rates)}
-        </p>
-      )}
     </div>
   )
 }

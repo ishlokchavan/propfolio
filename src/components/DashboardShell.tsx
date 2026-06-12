@@ -9,6 +9,7 @@ import PaymentsTab from './PaymentsTab'
 import ConnectTab from './ConnectTab'
 import SettingsTab from './SettingsTab'
 import InstallBanner from './InstallBanner'
+import InsightsTab from './InsightsTab'
 
 interface Props {
   user: User
@@ -17,7 +18,7 @@ interface Props {
   emailAccounts: EmailAccount[]
 }
 
-type Tab = 'portfolio' | 'payments' | 'connect' | 'settings'
+type Tab = 'portfolio' | 'payments' | 'insights' | 'settings'
 
 export default function DashboardShell({ user, profile, properties, emailAccounts }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('portfolio')
@@ -120,7 +121,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
           </div>
           <span className="font-bold text-lg" style={{ color: 'var(--text)' }}>Propfolio</span>
         </div>
-        {([['portfolio', 'Portfolio'], ['payments', 'Payments'], ['connect', 'Emails'], ['settings', 'Settings']] as Array<[Tab, string]>).map(([tab, label]) => (
+        {([['portfolio', 'Portfolio'], ['payments', 'Payments'], ['insights', 'Insights'], ['settings', 'Settings']] as Array<[Tab, string]>).map(([tab, label]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             className="text-left px-4 py-3 rounded-xl text-[14px] font-semibold transition-all"
             style={activeTab === tab
@@ -138,7 +139,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
           <PortfolioTab
             properties={localProperties}
             hasAccounts={localAccounts.length > 0}
-            onConnectClick={() => setActiveTab('connect')}
+            onConnectClick={() => setActiveTab('settings')}
             currency={currency}
             rates={rates}
           />
@@ -146,15 +147,8 @@ export default function DashboardShell({ user, profile, properties, emailAccount
         <div className={activeTab === 'payments' ? 'block h-full' : 'hidden'}>
           <PaymentsTab properties={localProperties} />
         </div>
-        <div className={activeTab === 'connect' ? 'block h-full' : 'hidden'}>
-          <ConnectTab
-            user={user}
-            accounts={localAccounts}
-            onAccountAdded={(acc) => setLocalAccounts(prev => [...prev, acc])}
-            onAccountRemoved={(id) => setLocalAccounts(prev => prev.filter(a => a.id !== id))}
-            onPropertiesFound={(props) => setLocalProperties(prev => [...prev, ...props])}
-            onSignOut={signOut}
-          />
+        <div className={activeTab === 'insights' ? 'block h-full' : 'hidden'}>
+          <InsightsTab properties={localProperties} currency={currency} rates={rates} />
         </div>
         <div className={activeTab === 'settings' ? 'block h-full' : 'hidden'}>
           <SettingsTab
@@ -163,6 +157,17 @@ export default function DashboardShell({ user, profile, properties, emailAccount
             onSignOut={signOut}
             onCurrencyChange={(primary, secondary) => setCurrency({ primary, secondary })}
             waSummary={waSummary}
+            emailSection={
+              <ConnectTab
+                compact
+                user={user}
+                accounts={localAccounts}
+                onAccountAdded={(acc) => setLocalAccounts(prev => [...prev, acc])}
+                onAccountRemoved={(id) => setLocalAccounts(prev => prev.filter(a => a.id !== id))}
+                onPropertiesFound={(props) => setLocalProperties(prev => [...prev, ...props])}
+                onSignOut={signOut}
+              />
+            }
           />
         </div>
       </div>
@@ -201,14 +206,12 @@ export default function DashboardShell({ user, profile, properties, emailAccount
             </svg>
           </NavItem>
           <NavItem
-            label="Emails"
-            active={activeTab === 'connect'}
-            onClick={() => setActiveTab('connect')}
-            badge={localAccounts.length > 0 ? localAccounts.length : undefined}
+            label="Insights"
+            active={activeTab === 'insights'}
+            onClick={() => setActiveTab('insights')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="22" height="22">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-              <polyline points="22,6 12,13 2,6"/>
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
             </svg>
           </NavItem>
           <NavItem
