@@ -30,6 +30,10 @@ export default function DashboardShell({ user, profile, properties, emailAccount
   const [rates, setRates] = useState<Record<string, number>>({ AED: 1 })
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
+  }, [])
+
+  useEffect(() => {
     fetch('https://open.er-api.com/v6/latest/AED')
       .then(r => r.json())
       .then(d => { if (d?.rates) setRates({ AED: 1, ...d.rates }) })
@@ -82,6 +86,16 @@ export default function DashboardShell({ user, profile, properties, emailAccount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const waSummary = (() => {
+    if (localProperties.length === 0) return 'Tracking my UAE property portfolio with Propfolio \u2014 https://propfolio-nu.vercel.app'
+    const total = localProperties.reduce((s, p) => s + p.total_value, 0)
+    const paid = localProperties.reduce((s, p) => s + p.paid_amount, 0)
+    const lines = localProperties.map(p =>
+      `\u2022 ${p.project_name} (${p.developer}) \u2014 AED ${(p.total_value / 1e6).toFixed(2)}M, ${Math.round((p.paid_amount / p.total_value) * 100)}% paid`
+    )
+    return `\ud83c\udfd7\ufe0f My Property Portfolio\n\nTotal: AED ${(total / 1e6).toFixed(2)}M \u00b7 Paid: AED ${(paid / 1e6).toFixed(2)}M\n${localProperties.length} properties:\n${lines.join('\n')}\n\nTracked with Propfolio`
+  })()
+
   async function signOut() {
     await supabase.auth.signOut()
     window.location.href = '/'
@@ -89,15 +103,33 @@ export default function DashboardShell({ user, profile, properties, emailAccount
 
   return (
     <div
-      className="flex flex-col"
-      style={{
-        height: '100dvh',
-        background: 'var(--bg)',
-        maxWidth: 480,
-        margin: '0 auto',
-        position: 'relative',
-      }}
+      className="flex flex-col lg:flex-row w-full lg:max-w-6xl mx-auto"
+      style={{ height: '100dvh', background: 'var(--bg)', position: 'relative' }}
     >
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex flex-col w-60 flex-shrink-0 px-4 py-8 gap-1"
+        style={{ borderRight: '1px solid var(--border)' }}>
+        <div className="flex items-center gap-3 px-3 mb-8">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent2))' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+          </div>
+          <span className="font-bold text-lg" style={{ color: 'var(--text)' }}>Propfolio</span>
+        </div>
+        {([['portfolio', 'Portfolio'], ['payments', 'Payments'], ['connect', 'Emails'], ['settings', 'Settings']] as Array<[Tab, string]>).map(([tab, label]) => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className="text-left px-4 py-3 rounded-xl text-[14px] font-semibold transition-all"
+            style={activeTab === tab
+              ? { background: 'var(--surface2)', color: 'var(--accent2)' }
+              : { color: 'var(--text3)' }}>
+            {label}
+          </button>
+        ))}
+      </aside>
+
+      <div className="flex flex-col flex-1 min-w-0" style={{ height: '100dvh' }}>
       {/* Screen content */}
       <div className="flex-1 overflow-hidden relative">
         <div className={activeTab === 'portfolio' ? 'block h-full' : 'hidden'}>
@@ -128,14 +160,16 @@ export default function DashboardShell({ user, profile, properties, emailAccount
             profile={profile}
             onSignOut={signOut}
             onCurrencyChange={(primary, secondary) => setCurrency({ primary, secondary })}
+            waSummary={waSummary}
           />
         </div>
       </div>
 
-      {/* Bottom nav */}
+      {/* Bottom nav (mobile/tablet) */}
       <nav
+        className="lg:hidden"
         style={{
-          background: 'rgba(9,9,14,0.95)',
+          background: 'var(--nav-bg)',
           backdropFilter: 'blur(20px)',
           borderTop: '1px solid var(--border)',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
@@ -187,6 +221,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
           </NavItem>
         </div>
       </nav>
+      </div>
     </div>
   )
 }
@@ -200,7 +235,7 @@ function NavItem({
     <button
       onClick={onClick}
       className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all active:scale-95"
-      style={{ color: active ? '#A78BFA' : '#4A4960', position: 'relative' }}
+      style={{ color: active ? 'var(--accent2)' : 'var(--text4)', position: 'relative' }}
     >
       <span style={{ filter: active ? 'drop-shadow(0 0 8px rgba(167,139,250,0.6))' : 'none' }}>
         {children}
@@ -209,7 +244,7 @@ function NavItem({
       {badge !== undefined && (
         <span
           className="absolute top-1 right-3 text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center"
-          style={{ background: '#7C6FED', color: 'white' }}
+          style={{ background: 'var(--accent)', color: 'white' }}
         >
           {badge}
         </span>

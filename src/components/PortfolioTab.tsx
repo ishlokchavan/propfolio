@@ -38,10 +38,10 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
         className="px-5 pt-safe pb-2"
         style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}
       >
-        <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: '#A78BFA' }}>
+        <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--accent2)' }}>
           Propfolio
         </p>
-        <h1 className="text-3xl font-bold" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+        <h1 className="text-3xl font-bold" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
           Portfolio
         </h1>
       </div>
@@ -51,22 +51,22 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
       ) : (
         <>
           {/* Hero card */}
-          <div className="mx-4 mt-3 rounded-2xl p-5 relative overflow-hidden"
+          <div className="mx-4 mt-3 rounded-2xl p-5 relative overflow-hidden anim-in"
             style={{
-              background: 'linear-gradient(135deg, #1a1535 0%, #12122a 50%, #0d1a35 100%)',
+              background: 'var(--hero-bg)',
               border: '1px solid rgba(124,111,237,0.2)',
             }}
           >
             <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-30"
               style={{ background: 'radial-gradient(circle, #7C6FED 0%, transparent 70%)' }} />
-            <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: '#6B6A7F' }}>
+            <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--text3)' }}>
               Total Portfolio Value
             </p>
-            <p className="text-4xl font-bold mb-1" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+            <p className="text-4xl font-bold mb-1" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
               {formatMoney(totalValue, currency.primary, rates)}
             </p>
             {currency.secondary !== 'none' && formatMoney(totalValue, currency.secondary, rates) && (
-              <p className="text-[15px] font-medium mb-3" style={{ color: '#6B6A7F' }}>
+              <p className="text-[15px] font-medium mb-3" style={{ color: 'var(--text3)' }}>
                 ≈ {formatMoney(totalValue, currency.secondary, rates)}
               </p>
             )}
@@ -97,9 +97,11 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
           {/* Properties */}
           <div className="mx-4 mt-4 mb-6">
             <SectionHeader title="Properties" right={`${properties.length} total`} />
-            <div className="space-y-3">
-              {properties.map(p => (
-                <PropertyCard key={p.id} property={p} onClick={() => setDetail(p)} />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {properties.map((p, i) => (
+                <div key={p.id} className={`anim-in-${Math.min(i, 3)}`}>
+                  <PropertyCard property={p} onClick={() => setDetail(p)} />
+                </div>
               ))}
             </div>
           </div>
@@ -119,8 +121,8 @@ function EmptyState({ hasAccounts, onConnectClick }: { hasAccounts: boolean; onC
           <polyline points="9 22 9 12 15 12 15 22"/>
         </svg>
       </div>
-      <h2 className="text-xl font-bold mb-2" style={{ color: '#9B9AB0' }}>No properties yet</h2>
-      <p className="text-sm leading-relaxed mb-8" style={{ color: '#4A4960' }}>
+      <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text2)' }}>No properties yet</h2>
+      <p className="text-sm leading-relaxed mb-8" style={{ color: 'var(--text4)' }}>
         {hasAccounts
           ? 'Your email is connected. We\'re scanning for properties — check back shortly.'
           : 'Connect your email and we\'ll automatically find all your developer communications and build your portfolio.'}
@@ -129,7 +131,7 @@ function EmptyState({ hasAccounts, onConnectClick }: { hasAccounts: boolean; onC
         <button
           onClick={onConnectClick}
           className="py-4 px-8 rounded-2xl font-semibold text-base active:scale-95 transition-all"
-          style={{ background: 'linear-gradient(135deg, #7C6FED, #A78BFA)', color: 'white' }}
+          style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent2))', color: 'white' }}
         >
           Connect Email →
         </button>
@@ -149,31 +151,31 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
   return (
     <button
       onClick={onClick}
-      className="w-full text-left rounded-2xl p-4 transition-all active:scale-98"
+      className="w-full h-full text-left rounded-2xl p-4 transition-all active:scale-98 hover:translate-y-[-2px]"
       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
     >
       {/* Dev color bar */}
       <div className={`h-0.5 rounded-full bg-gradient-to-r ${colorClass} mb-3`} />
 
       <div className="flex items-start justify-between mb-1">
-        <h3 className="font-semibold text-[15px] leading-tight pr-2" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+        <h3 className="font-semibold text-[15px] leading-tight pr-2" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
           {p.project_name}
         </h3>
         <span className="flex items-center gap-1.5 flex-shrink-0">
           {resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)?.eligible && (
             <span className="text-[10px] font-bold px-2 py-1 rounded-full"
-              style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+              style={{ background: 'rgba(16,185,129,0.15)', color: 'var(--green)' }}>
               Resale ✓
             </span>
           )}
           <span className="text-[10px] font-semibold px-2 py-1 rounded-full"
-            style={{ background: 'rgba(124,111,237,0.15)', color: '#A78BFA' }}>
+            style={{ background: 'rgba(124,111,237,0.15)', color: 'var(--accent2)' }}>
             {p.property_type || 'Unit'}
           </span>
         </span>
       </div>
 
-      <p className="text-[12px] mb-3 font-medium" style={{ color: '#4A4960' }}>
+      <p className="text-[12px] mb-3 font-medium" style={{ color: 'var(--text4)' }}>
         {p.developer} · {p.location || p.emirate}
         {p.unit_number && ` · ${p.unit_number}`}
       </p>
@@ -181,13 +183,13 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
       {/* Progress */}
       <div className="mb-3">
         <div className="flex justify-between text-[11px] mb-1.5">
-          <span style={{ color: '#4A4960' }}>Payment progress</span>
-          <span className="font-semibold" style={{ color: '#A78BFA' }}>{progress}%</span>
+          <span style={{ color: 'var(--text4)' }}>Payment progress</span>
+          <span className="font-semibold" style={{ color: 'var(--accent2)' }}>{progress}%</span>
         </div>
-        <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div className="h-1 rounded-full" style={{ background: 'var(--track)' }}>
           <div
             className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #7C6FED, #A78BFA)' }}
+            style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }}
           />
         </div>
       </div>
@@ -207,7 +209,7 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
 function NextPaymentCard({ milestone, onClick }: { milestone: any; onClick: () => void }) {
   const days = milestone.due_date ? daysUntil(milestone.due_date) : null
   const urgency = days !== null ? getUrgencyClass(days) : 'future'
-  const urgencyColor = urgency === 'overdue' ? '#EF4444' : urgency === 'urgent' ? '#F59E0B' : '#A78BFA'
+  const urgencyColor = urgency === 'overdue' ? 'var(--red)' : urgency === 'urgent' ? 'var(--gold)' : 'var(--accent2)'
   const date = milestone.due_date ? new Date(milestone.due_date) : null
 
   return (
@@ -226,10 +228,10 @@ function NextPaymentCard({ milestone, onClick }: { milestone: any; onClick: () =
         </span>
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-[14px] truncate" style={{ color: '#F1F0FF' }}>
+        <p className="font-semibold text-[14px] truncate" style={{ color: 'var(--text)' }}>
           {milestone.property.project_name}
         </p>
-        <p className="text-[11px] mt-0.5" style={{ color: '#6B6A7F' }}>{milestone.label}</p>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{milestone.label}</p>
       </div>
       <div className="text-right flex-shrink-0">
         <p className="font-bold text-[15px] font-mono" style={{ color: urgencyColor }}>
@@ -248,8 +250,8 @@ function NextPaymentCard({ milestone, onClick }: { milestone: any; onClick: () =
 function SectionHeader({ title, right }: { title: string; right?: string }) {
   return (
     <div className="flex items-center justify-between mb-3">
-      <p className="text-[12px] font-semibold tracking-wider uppercase" style={{ color: '#6B6A7F' }}>{title}</p>
-      {right && <p className="text-[12px]" style={{ color: '#A78BFA' }}>{right}</p>}
+      <p className="text-[12px] font-semibold tracking-wider uppercase" style={{ color: 'var(--text3)' }}>{title}</p>
+      {right && <p className="text-[12px]" style={{ color: 'var(--accent2)' }}>{right}</p>}
     </div>
   )
 }
@@ -257,8 +259,8 @@ function SectionHeader({ title, right }: { title: string; right?: string }) {
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: '#4A4960' }}>{label}</p>
-      <p className="text-[15px] font-semibold" style={{ color: color || '#F1F0FF' }}>{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text4)' }}>{label}</p>
+      <p className="text-[15px] font-semibold" style={{ color: color || 'var(--text)' }}>{value}</p>
     </div>
   )
 }
@@ -266,8 +268,8 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
 function MiniStat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex-1">
-      <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: '#4A4960' }}>{label}</p>
-      <p className="text-[13px] font-semibold" style={{ color: highlight ? '#F59E0B' : '#F1F0FF' }}>{value}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--text4)' }}>{label}</p>
+      <p className="text-[13px] font-semibold" style={{ color: highlight ? 'var(--gold)' : 'var(--text)' }}>{value}</p>
     </div>
   )
 }
@@ -283,7 +285,7 @@ function ResaleStrip({ properties, onSelect }: { properties: Property[]; onSelec
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
           <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
-        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#10B981' }}>
+        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: 'var(--green)' }}>
           {eligible.length} {eligible.length === 1 ? 'property' : 'properties'} resale-eligible
         </p>
       </div>
@@ -291,12 +293,12 @@ function ResaleStrip({ properties, onSelect }: { properties: Property[]; onSelec
         {eligible.map(p => (
           <button key={p.id} onClick={() => onSelect(p)}
             className="text-[12px] font-semibold px-3 py-1.5 rounded-full active:scale-95 transition-all"
-            style={{ background: 'rgba(16,185,129,0.12)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+            style={{ background: 'rgba(16,185,129,0.12)', color: 'var(--green2)', border: '1px solid rgba(16,185,129,0.25)' }}>
             {p.project_name}
           </button>
         ))}
       </div>
-      <p className="text-[11px] mt-2.5" style={{ color: '#4A4960' }}>
+      <p className="text-[11px] mt-2.5" style={{ color: 'var(--text4)' }}>
         Paid % has crossed the developer&apos;s NOC threshold — these units can be resold now.
       </p>
     </div>
@@ -311,25 +313,25 @@ function CashflowChart({ properties, currency, rates }: { properties: Property[]
 
   return (
     <div className="mx-4 mt-3 p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p className="text-[12px] font-bold uppercase tracking-wider mb-3" style={{ color: '#6B6A7F' }}>
+      <p className="text-[12px] font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text3)' }}>
         Upcoming Cashflow by Year
       </p>
       <div className="space-y-2.5">
         {byYear.map(y => (
           <div key={y.year} className="flex items-center gap-3">
-            <span className="text-[12px] font-bold w-9 flex-shrink-0" style={{ color: '#9B9AB0' }}>{y.year}</span>
-            <div className="flex-1 h-5 rounded-md relative overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <span className="text-[12px] font-bold w-9 flex-shrink-0" style={{ color: 'var(--text2)' }}>{y.year}</span>
+            <div className="flex-1 h-5 rounded-md relative overflow-hidden" style={{ background: 'var(--track)' }}>
               <div className="h-full rounded-md transition-all duration-700"
-                style={{ width: `${Math.max(4, (y.total / max) * 100)}%`, background: 'linear-gradient(90deg, #7C6FED, #A78BFA)' }} />
+                style={{ width: `${Math.max(4, (y.total / max) * 100)}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }} />
             </div>
-            <span className="text-[12px] font-bold flex-shrink-0 w-20 text-right" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
+            <span className="text-[12px] font-bold flex-shrink-0 w-20 text-right" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
               {formatMoney(y.total, currency.primary, rates)}
             </span>
           </div>
         ))}
       </div>
       {currency.secondary !== 'none' && (
-        <p className="text-[11px] mt-3" style={{ color: '#4A4960' }}>
+        <p className="text-[11px] mt-3" style={{ color: 'var(--text4)' }}>
           Total pending: {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.primary, rates)}
           {' '}≈ {formatMoney(byYear.reduce((s, y) => s + y.total, 0), currency.secondary, rates)}
         </p>
@@ -359,11 +361,11 @@ function DueAlert({ properties, currency, rates, onSelect }: { properties: Prope
           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
           <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>
+        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: 'var(--gold)' }}>
           {urgent.length} payment{urgent.length > 1 ? 's' : ''} due within 14 days
         </p>
       </div>
-      <p className="text-[13px]" style={{ color: '#D4A853' }}>
+      <p className="text-[13px]" style={{ color: 'var(--gold2)' }}>
         {urgent[0].p.project_name} — {formatMoney(urgent[0].m.amount, currency.primary, rates)} {urgent[0].days <= 0 ? 'due today' : `in ${urgent[0].days}d`}
         {urgent.length > 1 ? ` · ${formatMoney(total, currency.primary, rates)} total` : ''}
       </p>

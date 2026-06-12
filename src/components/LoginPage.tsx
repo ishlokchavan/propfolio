@@ -34,7 +34,7 @@ export default function LoginPage() {
         <div className="mb-12 text-center">
           <div
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
-            style={{ background: 'linear-gradient(135deg, #7C6FED, #A78BFA)' }}
+            style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent2))' }}
           >
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
@@ -43,11 +43,11 @@ export default function LoginPage() {
           </div>
           <h1
             className="text-3xl font-bold tracking-tight"
-            style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}
+            style={{ color: 'var(--text)', fontFamily: 'system-ui' }}
           >
             Propfolio
           </h1>
-          <p className="mt-2 text-base" style={{ color: '#6B6A7F' }}>
+          <p className="mt-2 text-base" style={{ color: 'var(--text3)' }}>
             All your UAE property investments,<br />in one place.
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function LoginPage() {
               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
               <span className="text-lg leading-none mt-0.5">{item.icon}</span>
-              <p className="text-sm leading-snug" style={{ color: '#9B9AB0' }}>{item.text}</p>
+              <p className="text-sm leading-snug" style={{ color: 'var(--text2)' }}>{item.text}</p>
             </div>
           ))}
         </div>
@@ -76,7 +76,7 @@ export default function LoginPage() {
             onClick={() => signIn('google')}
             disabled={loading !== null}
             className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-semibold text-base transition-all active:scale-95 disabled:opacity-60"
-            style={{ background: 'white', color: '#1a1a2e' }}
+            style={{ background: 'var(--btn-contrast-bg)', color: 'var(--btn-contrast-text)' }}
           >
             {loading === 'google' ? (
               <Spinner />
@@ -95,7 +95,7 @@ export default function LoginPage() {
             onClick={() => signIn('azure')}
             disabled={loading !== null}
             className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-semibold text-base transition-all active:scale-95 disabled:opacity-60"
-            style={{ background: 'var(--surface2)', color: '#F1F0FF', border: '1px solid var(--border)' }}
+            style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
           >
             {loading === 'microsoft' ? (
               <Spinner light />
@@ -111,7 +111,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="text-center text-xs mt-6" style={{ color: '#4A4960' }}>
+        <p className="text-center text-xs mt-6" style={{ color: 'var(--text4)' }}>
           We read emails to find your property data.<br />We never send emails on your behalf.
         </p>
       </div>

@@ -32,8 +32,8 @@ export default function PaymentsTab({ properties }: Props) {
   return (
     <div className="h-full overflow-y-auto scroll-smooth">
       <div className="px-5" style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}>
-        <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: '#A78BFA' }}>Payments</p>
-        <h1 className="text-3xl font-bold mb-4" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>Schedule</h1>
+        <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--accent2)' }}>Payments</p>
+        <h1 className="text-3xl font-bold mb-4" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>Schedule</h1>
       </div>
 
       {all.length === 0 ? (
@@ -41,22 +41,22 @@ export default function PaymentsTab({ properties }: Props) {
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4A4960" strokeWidth="1.5" className="mb-4 opacity-50" strokeLinecap="round">
             <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
           </svg>
-          <p className="text-lg font-semibold mb-2" style={{ color: '#6B6A7F' }}>No payments yet</p>
-          <p className="text-sm" style={{ color: '#4A4960' }}>Connect your email to see your payment schedule.</p>
+          <p className="text-lg font-semibold mb-2" style={{ color: 'var(--text3)' }}>No payments yet</p>
+          <p className="text-sm" style={{ color: 'var(--text4)' }}>Connect your email to see your payment schedule.</p>
         </div>
       ) : (
         <>
           {/* Summary */}
           <div className="grid grid-cols-2 gap-2.5 mx-4 mb-4">
             <div className="p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid rgba(245,158,11,0.2)' }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#4A4960' }}>Due Soon</p>
-              <p className="text-xl font-bold" style={{ color: '#F59E0B', fontFamily: 'system-ui' }}>{formatAED(totalDue, true)}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: '#6B6A7F' }}>{due.length} payment{due.length !== 1 ? 's' : ''}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text4)' }}>Due Soon</p>
+              <p className="text-xl font-bold" style={{ color: 'var(--gold)', fontFamily: 'system-ui' }}>{formatAED(totalDue, true)}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{due.length} payment{due.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="p-4 rounded-2xl" style={{ background: 'var(--surface)', border: '1px solid rgba(124,111,237,0.2)' }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: '#4A4960' }}>Outstanding</p>
-              <p className="text-xl font-bold" style={{ color: '#A78BFA', fontFamily: 'system-ui' }}>{formatAED(totalFuture, true)}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: '#6B6A7F' }}>{future.length} upcoming</p>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text4)' }}>Outstanding</p>
+              <p className="text-xl font-bold" style={{ color: 'var(--accent2)', fontFamily: 'system-ui' }}>{formatAED(totalFuture, true)}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--text3)' }}>{future.length} upcoming</p>
             </div>
           </div>
 
@@ -92,14 +92,14 @@ function Section({ title, color, children }: { title: string; color?: string; ch
   return (
     <div className="mx-4 mb-4">
       <p className="text-[12px] font-semibold tracking-wider uppercase mb-2"
-        style={{ color: color || '#6B6A7F' }}>{title}</p>
+        style={{ color: color || 'var(--text3)' }}>{title}</p>
       <div className="space-y-2">{children}</div>
     </div>
   )
 }
 
 function MilestoneRow({ milestone: m, type }: { milestone: MilestoneWithProperty; type: 'paid' | 'due' | 'future' }) {
-  const color = type === 'paid' ? '#10B981' : type === 'due' ? '#F59E0B' : '#6B6A7F'
+  const color = type === 'paid' ? 'var(--green)' : type === 'due' ? 'var(--gold)' : 'var(--text3)'
   const days = m.due_date ? daysUntil(m.due_date) : null
   const date = m.due_date
     ? new Date(m.due_date).toLocaleDateString('en-AE', { day: 'numeric', month: 'short' })
@@ -125,10 +125,10 @@ function MilestoneRow({ milestone: m, type }: { milestone: MilestoneWithProperty
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-semibold truncate" style={{ color: type === 'future' ? '#9B9AB0' : '#F1F0FF' }}>
+        <p className="text-[13px] font-semibold truncate" style={{ color: type === 'future' ? 'var(--text2)' : 'var(--text)' }}>
           {m.property.project_name}
         </p>
-        <p className="text-[11px] mt-0.5" style={{ color: '#4A4960' }}>
+        <p className="text-[11px] mt-0.5" style={{ color: 'var(--text4)' }}>
           {m.label}{type !== 'paid' && days !== null ? ` · ${daysLabel(days)}` : ''}
         </p>
       </div>

@@ -24,10 +24,30 @@ export const viewport: Viewport = {
   themeColor: '#09090E',
 }
 
+const themeScript = `
+(function(){
+  try {
+    var pref = localStorage.getItem('pf_theme') || 'system';
+    var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    if (pref === 'system') {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e){
+        if ((localStorage.getItem('pf_theme') || 'system') === 'system') {
+          document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        }
+      });
+    }
+  } catch(e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+})();
+`
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased">
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {children}
+      </body>
     </html>
   )
 }

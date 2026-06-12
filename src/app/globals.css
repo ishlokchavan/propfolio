@@ -1,29 +1,78 @@
 @import "tailwindcss";
 
-:root {
+:root, [data-theme="dark"] {
   --bg: #09090E;
   --surface: #111118;
   --surface2: #1A1A24;
   --border: rgba(255,255,255,0.07);
+  --track: rgba(255,255,255,0.06);
   --accent: #7C6FED;
   --accent2: #A78BFA;
   --gold: #F59E0B;
+  --gold2: #D4A853;
   --green: #10B981;
+  --green2: #34D399;
   --red: #EF4444;
+  --text: #F1F0FF;
+  --text2: #9B9AB0;
+  --text3: #6B6A7F;
+  --text4: #4A4960;
+  --hero-bg: linear-gradient(135deg, #1a1535 0%, #12122a 50%, #0d1a35 100%);
+  --hero-border: rgba(124,111,237,0.2);
+  --nav-bg: rgba(9,9,14,0.95);
+  --btn-contrast-bg: #ffffff;
+  --btn-contrast-text: #1a1a2e;
+}
+
+[data-theme="light"] {
+  --bg: #F6F6FA;
+  --surface: #FFFFFF;
+  --surface2: #EFEFF6;
+  --border: rgba(20,20,45,0.09);
+  --track: rgba(20,20,45,0.08);
+  --accent: #6C5DE0;
+  --accent2: #6D5BD0;
+  --gold: #B97E0A;
+  --gold2: #9A6E14;
+  --green: #0B9E6E;
+  --green2: #0A8A60;
+  --red: #DC2626;
+  --text: #17172B;
+  --text2: #41415E;
+  --text3: #5F5F7D;
+  --text4: #8585A0;
+  --hero-bg: linear-gradient(135deg, #ECE9FF 0%, #F2EFFF 50%, #E7EFFF 100%);
+  --hero-border: rgba(108,93,224,0.25);
+  --nav-bg: rgba(255,255,255,0.94);
+  --btn-contrast-bg: #17172B;
+  --btn-contrast-text: #ffffff;
 }
 
 * { -webkit-tap-highlight-color: transparent; }
 
 body {
   background: var(--bg);
-  color: #F1F0FF;
+  color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 html, body, #__next { height: 100%; }
-
 ::-webkit-scrollbar { width: 0; height: 0; }
-
-/* smooth scrolling on iOS */
 .scroll-smooth { -webkit-overflow-scrolling: touch; }
+
+/* UX polish: entrance animations */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-in { animation: cardIn 0.4s ease both; }
+.anim-in-1 { animation: cardIn 0.4s 0.05s ease both; }
+.anim-in-2 { animation: cardIn 0.4s 0.10s ease both; }
+.anim-in-3 { animation: cardIn 0.4s 0.15s ease both; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+}
+.pulse-dot { animation: pulse-dot 1.4s ease infinite; }

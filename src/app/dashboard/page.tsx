@@ -11,8 +11,7 @@ export default async function DashboardPage() {
     supabase
       .from('properties')
       .select('*, payment_milestones(*)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false }),  // RLS returns own + shared-with-me
     supabase
       .from('email_accounts')
       .select('*')
