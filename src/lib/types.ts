@@ -32,6 +32,7 @@ export interface Property {
   handover_date: string | null
   ownership_names: string[] | null
   ownership_split: string
+  noc_threshold: number | null
   ai_confidence: number | null
   created_at: string
   updated_at: string

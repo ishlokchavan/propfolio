@@ -1,7 +1,7 @@
 'use client'
 
 import { Property } from '@/lib/types'
-import { formatAED, paymentProgress, developerColor } from '@/lib/utils'
+import { formatAED, paymentProgress, developerColor, resaleStatus } from '@/lib/utils'
 
 interface Props {
   property: Property
@@ -75,6 +75,9 @@ export default function PropertyDetail({ property: p, onBack }: Props) {
         ))}
       </div>
 
+      {/* Resale NOC card */}
+      <ResaleCard property={p} />
+
       {/* Payment timeline */}
       <div className="mx-4 mt-4 mb-8">
         <p className="text-[12px] font-semibold tracking-wider uppercase mb-3" style={{ color: '#6B6A7F' }}>
@@ -122,6 +125,52 @@ export default function PropertyDetail({ property: p, onBack }: Props) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ResaleCard({ property: p }: { property: Property }) {
+  const rs = resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)
+  if (!rs) return null
+
+  const color = rs.eligible ? '#10B981' : '#F59E0B'
+  const barPct = Math.min(100, (rs.paidPct / rs.threshold) * 100)
+
+  return (
+    <div className="mx-4 mt-3 p-4 rounded-2xl"
+      style={{ background: `${color}08`, border: `1px solid ${color}30` }}>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color }}>
+          Resale Eligibility
+        </p>
+        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+          style={{ background: `${color}18`, color }}>
+          {rs.eligible ? 'Eligible now' : 'Not yet'}
+        </span>
+      </div>
+
+      <div className="flex items-end justify-between mb-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-0.5" style={{ color: '#4A4960' }}>Paid</p>
+          <p className="text-xl font-bold" style={{ color, fontFamily: 'system-ui' }}>{rs.paidPct}%</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] uppercase tracking-wider font-semibold mb-0.5" style={{ color: '#4A4960' }}>NOC threshold</p>
+          <p className="text-xl font-bold" style={{ color: '#9B9AB0', fontFamily: 'system-ui' }}>{rs.threshold}%</p>
+        </div>
+      </div>
+
+      {/* Progress toward threshold */}
+      <div className="h-2 rounded-full relative" style={{ background: 'rgba(255,255,255,0.06)' }}>
+        <div className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${barPct}%`, background: `linear-gradient(90deg, ${color}90, ${color})` }} />
+      </div>
+
+      <p className="text-[12px] mt-3 leading-relaxed" style={{ color: rs.eligible ? '#34D399' : '#9B9AB0' }}>
+        {rs.eligible
+          ? `This unit has crossed ${p.developer}'s ${rs.threshold}% NOC threshold — you can apply for a resale NOC and list it today.`
+          : `Pay ${formatAED(rs.amountToEligibility, true)} more to cross ${p.developer}'s ${rs.threshold}% threshold and unlock resale.`}
+      </p>
     </div>
   )
 }

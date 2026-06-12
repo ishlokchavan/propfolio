@@ -56,3 +56,18 @@ export function developerColor(developer: string): string {
 export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+export interface ResaleStatus {
+  eligible: boolean
+  paidPct: number
+  threshold: number
+  amountToEligibility: number
+}
+
+export function resaleStatus(paid: number, total: number, threshold: number | null): ResaleStatus | null {
+  if (!threshold || total === 0) return null
+  const paidPct = (paid / total) * 100
+  const eligible = paidPct >= threshold
+  const amountToEligibility = eligible ? 0 : Math.ceil((threshold / 100) * total - paid)
+  return { eligible, paidPct: Math.round(paidPct), threshold, amountToEligibility }
+}

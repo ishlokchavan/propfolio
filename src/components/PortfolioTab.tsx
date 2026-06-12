@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Property } from '@/lib/types'
-import { formatAED, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor } from '@/lib/utils'
+import { formatAED, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor, resaleStatus } from '@/lib/utils'
 import PropertyDetail from './PropertyDetail'
 
 interface Props {
@@ -70,6 +70,9 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick }
               <Stat label="Properties" value={String(properties.length)} />
             </div>
           </div>
+
+          {/* Resale eligibility strip */}
+          <ResaleStrip properties={properties} onSelect={setDetail} />
 
           {/* Next due */}
           {nextDue && (
@@ -144,9 +147,17 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
         <h3 className="font-semibold text-[15px] leading-tight pr-2" style={{ color: '#F1F0FF', fontFamily: 'system-ui' }}>
           {p.project_name}
         </h3>
-        <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex-shrink-0"
-          style={{ background: 'rgba(124,111,237,0.15)', color: '#A78BFA' }}>
-          {p.property_type || 'Unit'}
+        <span className="flex items-center gap-1.5 flex-shrink-0">
+          {resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)?.eligible && (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full"
+              style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981' }}>
+              Resale ✓
+            </span>
+          )}
+          <span className="text-[10px] font-semibold px-2 py-1 rounded-full"
+            style={{ background: 'rgba(124,111,237,0.15)', color: '#A78BFA' }}>
+            {p.property_type || 'Unit'}
+          </span>
         </span>
       </div>
 
@@ -245,6 +256,37 @@ function MiniStat({ label, value, highlight }: { label: string; value: string; h
     <div className="flex-1">
       <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: '#4A4960' }}>{label}</p>
       <p className="text-[13px] font-semibold" style={{ color: highlight ? '#F59E0B' : '#F1F0FF' }}>{value}</p>
+    </div>
+  )
+}
+
+function ResaleStrip({ properties, onSelect }: { properties: Property[]; onSelect: (p: Property) => void }) {
+  const eligible = properties.filter(p => resaleStatus(p.paid_amount, p.total_value, p.noc_threshold)?.eligible)
+  if (eligible.length === 0) return null
+
+  return (
+    <div className="mx-4 mt-3 p-4 rounded-2xl"
+      style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <p className="text-[12px] font-bold uppercase tracking-wider" style={{ color: '#10B981' }}>
+          {eligible.length} {eligible.length === 1 ? 'property' : 'properties'} resale-eligible
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {eligible.map(p => (
+          <button key={p.id} onClick={() => onSelect(p)}
+            className="text-[12px] font-semibold px-3 py-1.5 rounded-full active:scale-95 transition-all"
+            style={{ background: 'rgba(16,185,129,0.12)', color: '#34D399', border: '1px solid rgba(16,185,129,0.25)' }}>
+            {p.project_name}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] mt-2.5" style={{ color: '#4A4960' }}>
+        Paid % has crossed the developer&apos;s NOC threshold — these units can be resold now.
+      </p>
     </div>
   )
 }
