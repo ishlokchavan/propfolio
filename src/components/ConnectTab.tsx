@@ -56,41 +56,46 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
   async function triggerSync(accountId: string) {
     setSyncState('syncing')
-    setSyncLog([])
+    setSyncLog([{ text: 'Connecting to your inbox...', type: 'info' }])
 
-    const addLog = (text: string, type = 'info') => {
-      setSyncLog(prev => [...prev, { text, type }])
+    try {
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        if (data.error === 'token_expired') {
+          setSyncLog(prev => [...prev, { text: 'Email access expired — please sign out and sign in again to reconnect.', type: 'error' }])
+        } else {
+          setSyncLog(prev => [...prev, { text: data.message || 'Sync failed. Try again.', type: 'error' }])
+        }
+        setSyncState('error')
+        return
+      }
+
+      // Show server log
+      if (data.log) {
+        setSyncLog(prev => [...prev, ...data.log.map((l: { message: string; type: string }) => ({ text: l.message, type: l.type }))])
+      }
+
+      if (data.properties?.length > 0) {
+        onPropertiesFound(data.properties)
+      }
+
+      setSyncState('done')
+
+      // Reload to fetch fresh data with milestones
+      if (data.propertiesFound > 0) {
+        setTimeout(() => window.location.reload(), 1500)
+      }
+    } catch {
+      setSyncLog(prev => [...prev, { text: 'Network error — check your connection and try again.', type: 'error' }])
+      setSyncState('error')
     }
-
-    addLog('Connecting to email server...')
-    await delay(400)
-    addLog('Scanning inbox for developer emails...', 'processing')
-    await delay(600)
-    addLog('Found: DAMAC — Booking Confirmation', 'found')
-    await delay(300)
-    addLog('Found: Emaar — SPA Execution Notice', 'found')
-    await delay(300)
-    addLog('Found: Prescott Development — Payment Plan', 'found')
-    await delay(400)
-    addLog('Parsing payment schedules with AI...', 'processing')
-    await delay(800)
-    addLog('Found: Arada — Masaar Welcome Pack', 'found')
-    await delay(300)
-    addLog('Found: DAMAC — Construction Update', 'found')
-    await delay(400)
-    addLog('Extracting 6 properties across 5 developers', 'processing')
-    await delay(600)
-    addLog('Calculating cashflow timelines...', 'processing')
-    await delay(500)
-    addLog('✓ Portfolio built — 6 properties detected', 'found')
-
-    // Update sync status
-    await supabase
-      .from('email_accounts')
-      .update({ sync_status: 'synced', last_synced_at: new Date().toISOString(), emails_scanned: 2847 })
-      .eq('id', accountId)
-
-    setSyncState('done')
   }
 
   const hasAccounts = accounts.length > 0
@@ -131,9 +136,9 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
             {syncLog.map((l, i) => (
               <div key={i} className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  style={{ background: l.type === 'found' ? '#10B981' : l.type === 'processing' ? '#A78BFA' : '#4A4960' }} />
+                  style={{ background: l.type === 'found' ? '#10B981' : l.type === 'processing' ? '#A78BFA' : l.type === 'error' ? '#EF4444' : '#4A4960' }} />
                 <p className="text-[12px]"
-                  style={{ color: l.type === 'found' ? '#10B981' : l.type === 'processing' ? '#A78BFA' : '#6B6A7F' }}>
+                  style={{ color: l.type === 'found' ? '#10B981' : l.type === 'processing' ? '#A78BFA' : l.type === 'error' ? '#EF4444' : '#6B6A7F' }}>
                   {l.text}
                 </p>
               </div>
@@ -306,4 +311,3 @@ function Spinner({ dark }: { dark?: boolean }) {
   )
 }
 
-function delay(ms: number) { return new Promise(r => setTimeout(r, ms)) }
