@@ -59,45 +59,60 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
     setSyncState('syncing')
     setSyncLog([{ text: 'Connecting to your inbox...', type: 'info' }])
 
+    const pushLog = (items: Array<{ message: string; type: string }>) =>
+      setSyncLog(prev => [...prev, ...items.map(l => ({ text: l.message, type: l.type }))])
+
     try {
-      const res = await fetch('/api/sync', {
+      // Phase 1: search
+      const startRes = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, action: 'start' }),
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        if (data.error === 'token_expired') {
-          setSyncLog(prev => [...prev, { text: 'Email access expired — please sign out and sign in again to reconnect.', type: 'error' }])
-        } else {
-          setSyncLog(prev => [...prev, { text: data.message || 'Sync failed. Try again.', type: 'error' }])
-        }
+      const startData = await startRes.json()
+      if (!startRes.ok) {
+        setSyncLog(prev => [...prev, { text: startData.message || 'Could not start scan.', type: 'error' }])
         setSyncState('error')
         return
       }
+      if (startData.log) pushLog(startData.log)
 
-      // Show server log
-      if (data.log) {
-        setSyncLog(prev => [...prev, ...data.log.map((l: { message: string; type: string }) => ({ text: l.message, type: l.type }))])
+      if (startData.totalEmails === 0) {
+        setSyncLog(prev => [...prev, { text: 'No developer emails found in this inbox.', type: 'info' }])
+        setSyncState('done')
+        return
       }
 
-      if (data.properties?.length > 0) {
-        onPropertiesFound(data.properties)
+      // Phase 2: process batches until done
+      let totalFound = 0
+      for (let i = 0; i < 40; i++) {
+        const res = await fetch('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountId, action: 'process', jobId: startData.jobId }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setSyncLog(prev => [...prev, { text: data.message || 'Batch failed — partial results saved.', type: 'error' }])
+          setSyncState('error')
+          return
+        }
+        if (data.log) pushLog(data.log)
+        totalFound = data.propertiesFound ?? totalFound
+        if (data.done) break
       }
 
       setSyncState('done')
-
-      // Reload to fetch fresh data with milestones
-      if (data.propertiesFound > 0) {
-        setTimeout(() => window.location.reload(), 1500)
+      if (totalFound > 0) {
+        setSyncLog(prev => [...prev, { text: 'Loading your portfolio...', type: 'processing' }])
+        setTimeout(() => window.location.reload(), 1200)
       }
     } catch {
-      setSyncLog(prev => [...prev, { text: 'Network error — check your connection and try again.', type: 'error' }])
+      setSyncLog(prev => [...prev, { text: 'Network error — check connection and try again.', type: 'error' }])
       setSyncState('error')
     }
   }
+
 
   const hasAccounts = accounts.length > 0
 
