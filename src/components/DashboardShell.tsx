@@ -33,14 +33,19 @@ export default function DashboardShell({ user, profile, properties, emailAccount
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.provider_token || !session.user.email) return
 
-      const provider = session.user.app_metadata.provider === 'azure' ? 'microsoft' : 'google'
+      const hint = localStorage.getItem('pf_link_provider')
+      const rawProvider = hint || session.user.app_metadata.provider
+      const provider = rawProvider === 'azure' ? 'microsoft' : 'google'
+      const identity = (session.user.identities || []).find(i => i.provider === rawProvider)
+      const accountEmail = (identity?.identity_data?.email as string) || session.user.email
+      localStorage.removeItem('pf_link_provider')
       const { data: upserted, error } = await supabase
         .from('email_accounts')
         .upsert(
           {
             user_id: session.user.id,
             provider,
-            email: session.user.email,
+            email: accountEmail,
             access_token: session.provider_token,
             refresh_token: session.provider_refresh_token || null,
             token_expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),

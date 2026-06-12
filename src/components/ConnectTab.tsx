@@ -24,30 +24,41 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
   async function connectGoogle() {
     setConnecting('google')
-    // In production: OAuth flow that grants Gmail read access
-    // For now: show the OAuth button that uses Supabase's built-in Google OAuth
-    // The access token from sign-in includes Gmail scope if configured
-    await supabase.auth.signInWithOAuth({
+    localStorage.setItem('pf_link_provider', 'google')
+    // linkIdentity attaches another mailbox to the CURRENT account
+    // (signInWithOAuth would switch users)
+    const { error } = await supabase.auth.linkIdentity({
       provider: 'google',
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        redirectTo: `${location.origin}/auth/callback?link=google`,
         scopes: 'https://www.googleapis.com/auth/gmail.readonly',
         queryParams: { access_type: 'offline', prompt: 'consent' },
       },
     })
-    setConnecting(null)
+    if (error) {
+      setSyncLog([{ text: error.message.includes('disabled')
+        ? 'Enable "Allow manual account linking" in Supabase → Auth → Settings, then try again.'
+        : error.message, type: 'error' }])
+      setConnecting(null)
+    }
   }
 
   async function connectMicrosoft() {
     setConnecting('microsoft')
-    await supabase.auth.signInWithOAuth({
+    localStorage.setItem('pf_link_provider', 'azure')
+    const { error } = await supabase.auth.linkIdentity({
       provider: 'azure',
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
-        scopes: 'https://graph.microsoft.com/Mail.Read offline_access',
+        redirectTo: `${location.origin}/auth/callback?link=azure`,
+        scopes: 'openid email profile offline_access https://graph.microsoft.com/Mail.Read',
       },
     })
-    setConnecting(null)
+    if (error) {
+      setSyncLog([{ text: error.message.includes('disabled')
+        ? 'Enable "Allow manual account linking" in Supabase → Auth → Settings, then try again.'
+        : error.message, type: 'error' }])
+      setConnecting(null)
+    }
   }
 
   async function removeAccount(id: string) {

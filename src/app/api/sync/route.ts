@@ -19,6 +19,9 @@ const GMAIL_QUERY = [
   'OR "installment" OR "handover" OR "oqood" OR "unit reservation" OR "payment received")',
 ].join(' ')
 
+const GRAPH_SEARCH = '"payment plan" OR "booking confirmation" OR "statement of account" OR "payment receipt" OR installment OR handover OR oqood OR damac OR emaar OR sobha OR arada OR nakheel OR aldar'
+
+
 interface ParsedMilestone {
   label: string
   amount: number
@@ -76,24 +79,11 @@ export async function POST(request: Request) {
 }
 
 // ── PHASE 1: search inbox, create job ──
-async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string }) {
-  let messageIds: string[] = []
-  let pageToken: string | undefined
-
-  while (messageIds.length < MAX_EMAILS) {
-    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
-    url.searchParams.set('q', GMAIL_QUERY)
-    url.searchParams.set('maxResults', '100')
-    if (pageToken) url.searchParams.set('pageToken', pageToken)
-
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${account.access_token}` } })
-    if (!res.ok) throw new Error(`Gmail search failed: ${res.status} ${(await res.text()).slice(0, 150)}`)
-    const data = await res.json()
-    messageIds.push(...(data.messages || []).map((m: { id: string }) => m.id))
-    pageToken = data.nextPageToken
-    if (!pageToken) break
-  }
-  messageIds = messageIds.slice(0, MAX_EMAILS)
+async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string; provider: string }) {
+  const messageIds = (account.provider === 'microsoft'
+    ? await searchOutlook(account.access_token)
+    : await searchGmail(account.access_token)
+  ).slice(0, MAX_EMAILS)
 
   await supabase.from('email_accounts').update({ sync_status: 'syncing' }).eq('id', account.id)
 
@@ -121,7 +111,7 @@ async function startSync(supabase: Awaited<ReturnType<typeof createClient>>, use
 }
 
 // ── PHASE 2: process one batch ──
-async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string }, jobId: string) {
+async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, account: { id: string; access_token: string; provider: string }, jobId: string) {
   const { data: job } = await supabase
     .from('sync_jobs')
     .select('*')
@@ -140,38 +130,10 @@ async function processBatch(supabase: Awaited<ReturnType<typeof createClient>>, 
     return NextResponse.json({ done: true, progress: 100, propertiesFound: job.properties_found, log: [{ message: `Scan complete — ${job.properties_found} properties in portfolio`, type: 'found' }] })
   }
 
-  // Fetch emails + PDF attachments
-  const emails: Array<{ subject: string; from: string; date: string; body: string }> = []
-  const pdfs: Array<{ name: string; data: string }> = []
-
-  const results = await Promise.all(batch.map(async (id) => {
-    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
-      { headers: { Authorization: `Bearer ${account.access_token}` } })
-    return res.ok ? res.json() : null
-  }))
-
-  for (const msg of results) {
-    if (!msg) continue
-    const headers = msg.payload?.headers || []
-    const h = (n: string) => headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())?.value || ''
-    emails.push({ subject: h('Subject'), from: h('From'), date: h('Date'), body: extractBody(msg.payload).slice(0, 2500) })
-
-    // Collect PDF attachments
-    if (pdfs.length < MAX_PDFS_PER_BATCH) {
-      for (const att of findPdfParts(msg.payload)) {
-        if (pdfs.length >= MAX_PDFS_PER_BATCH) break
-        if (att.size > MAX_PDF_BYTES) continue
-        const attRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}/attachments/${att.attachmentId}`,
-          { headers: { Authorization: `Bearer ${account.access_token}` } })
-        if (!attRes.ok) continue
-        const attData = await attRes.json()
-        if (attData.data) {
-          pdfs.push({ name: att.filename, data: attData.data.replace(/-/g, '+').replace(/_/g, '/') })
-        }
-      }
-    }
-  }
+  // Fetch emails + PDF attachments (provider-aware)
+  const { emails, pdfs } = account.provider === 'microsoft'
+    ? await fetchOutlookBatch(account.access_token, batch)
+    : await fetchGmailBatch(account.access_token, batch)
 
   // Parse with Claude — text digest + PDF documents
   const parsed = await parseWithClaude(emails, pdfs)
@@ -342,6 +304,110 @@ async function mergeProperty(
     })))
   }
   return 'inserted'
+}
+
+
+// ── Provider adapters ──
+
+async function searchGmail(token: string): Promise<string[]> {
+  const ids: string[] = []
+  let pageToken: string | undefined
+  while (ids.length < MAX_EMAILS) {
+    const url = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages')
+    url.searchParams.set('q', GMAIL_QUERY)
+    url.searchParams.set('maxResults', '100')
+    if (pageToken) url.searchParams.set('pageToken', pageToken)
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) throw new Error(`Gmail search failed: ${res.status} ${(await res.text()).slice(0, 150)}`)
+    const data = await res.json()
+    ids.push(...(data.messages || []).map((m: { id: string }) => m.id))
+    pageToken = data.nextPageToken
+    if (!pageToken) break
+  }
+  return ids
+}
+
+async function searchOutlook(token: string): Promise<string[]> {
+  const ids: string[] = []
+  let url: string | null =
+    `https://graph.microsoft.com/v1.0/me/messages?$search=${encodeURIComponent(GRAPH_SEARCH)}&$top=100&$select=id`
+  while (url && ids.length < MAX_EMAILS) {
+    const res: Response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) throw new Error(`Outlook search failed: ${res.status} ${(await res.text()).slice(0, 150)}`)
+    const data = await res.json()
+    ids.push(...(data.value || []).map((m: { id: string }) => m.id))
+    url = data['@odata.nextLink'] || null
+  }
+  return ids
+}
+
+async function fetchGmailBatch(token: string, batch: string[]) {
+  const emails: Array<{ subject: string; from: string; date: string; body: string }> = []
+  const pdfs: Array<{ name: string; data: string }> = []
+
+  const results = await Promise.all(batch.map(async (id) => {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+      { headers: { Authorization: `Bearer ${token}` } })
+    return res.ok ? res.json() : null
+  }))
+
+  for (const msg of results) {
+    if (!msg) continue
+    const headers = msg.payload?.headers || []
+    const h = (n: string) => headers.find((x: { name: string }) => x.name.toLowerCase() === n.toLowerCase())?.value || ''
+    emails.push({ subject: h('Subject'), from: h('From'), date: h('Date'), body: extractBody(msg.payload).slice(0, 2500) })
+
+    if (pdfs.length < MAX_PDFS_PER_BATCH) {
+      for (const att of findPdfParts(msg.payload)) {
+        if (pdfs.length >= MAX_PDFS_PER_BATCH) break
+        if (att.size > MAX_PDF_BYTES) continue
+        const attRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}/attachments/${att.attachmentId}`,
+          { headers: { Authorization: `Bearer ${token}` } })
+        if (!attRes.ok) continue
+        const attData = await attRes.json()
+        if (attData.data) pdfs.push({ name: att.filename, data: attData.data.replace(/-/g, '+').replace(/_/g, '/') })
+      }
+    }
+  }
+  return { emails, pdfs }
+}
+
+async function fetchOutlookBatch(token: string, batch: string[]) {
+  const emails: Array<{ subject: string; from: string; date: string; body: string }> = []
+  const pdfs: Array<{ name: string; data: string }> = []
+
+  const results = await Promise.all(batch.map(async (id) => {
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/me/messages/${id}?$select=subject,from,receivedDateTime,body,hasAttachments`,
+      { headers: { Authorization: `Bearer ${token}` } })
+    return res.ok ? res.json() : null
+  }))
+
+  for (const msg of results) {
+    if (!msg) continue
+    const bodyText = msg.body?.contentType === 'html' ? stripHtml(msg.body.content || '') : (msg.body?.content || '')
+    emails.push({
+      subject: msg.subject || '',
+      from: msg.from?.emailAddress?.address || '',
+      date: msg.receivedDateTime || '',
+      body: bodyText.slice(0, 2500),
+    })
+
+    if (msg.hasAttachments && pdfs.length < MAX_PDFS_PER_BATCH) {
+      const attRes = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${msg.id}/attachments`,
+        { headers: { Authorization: `Bearer ${token}` } })
+      if (!attRes.ok) continue
+      const attData = await attRes.json()
+      for (const att of attData.value || []) {
+        if (pdfs.length >= MAX_PDFS_PER_BATCH) break
+        if (att.contentType === 'application/pdf' && att.contentBytes && (att.size || 0) <= MAX_PDF_BYTES) {
+          pdfs.push({ name: att.name, data: att.contentBytes })
+        }
+      }
+    }
+  }
+  return { emails, pdfs }
 }
 
 // ── Gmail helpers ──
