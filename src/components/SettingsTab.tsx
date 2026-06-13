@@ -101,7 +101,7 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
   }
 
   return (
-    <div className="h-full overflow-y-auto scroll-smooth">
+    <div className="h-full overflow-y-auto scroll-smooth anim-tab">
       <div className="px-5" style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}>
         <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--accent2)' }}>Settings</p>
         <h1 className="text-3xl font-bold mb-5" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>Profile</h1>
@@ -163,7 +163,7 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
         <div className="flex gap-2">
           {[['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(([v, label]) => (
             <button key={v} onClick={() => applyTheme(v)}
-              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all active:scale-95"
+              className="flex-1 py-2.5 rounded-xl text-[13px] font-bold tap"
               style={theme === v
                 ? { background: 'linear-gradient(135deg, var(--accent), var(--accent2))', color: 'white' }
                 : { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
@@ -183,8 +183,7 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
           <button onClick={togglePush} disabled={pushBusy}
             className="w-[52px] h-[30px] rounded-full flex-shrink-0 transition-all relative disabled:opacity-50"
             style={{ background: pushEnabled ? 'var(--accent)' : 'var(--surface2)', border: '1px solid var(--border)' }}>
-            <span className="absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow transition-all"
-              style={{ left: pushEnabled ? 26 : 3 }} />
+            <span className="absolute top-[3px] w-[22px] h-[22px] rounded-full bg-white shadow" style={{ transition: 'left 0.28s cubic-bezier(0.34,1.56,0.64,1)', left: pushEnabled ? 26 : 3 }} data-thumb />
           </button>
         </div>
         <p className="text-[11px] mt-2.5" style={{ color: 'var(--text4)' }}>
@@ -210,7 +209,7 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
             className="flex-1 px-3.5 py-2.5 rounded-xl text-[14px] outline-none min-w-0"
             style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <button onClick={addShare}
-            className="px-4 py-2.5 rounded-xl text-[13px] font-bold flex-shrink-0 active:scale-95 transition-all"
+            className="px-4 py-2.5 rounded-xl text-[13px] font-bold flex-shrink-0 tap"
             style={{ background: 'linear-gradient(135deg, var(--accent), var(--accent2))', color: 'white' }}>
             Invite
           </button>
@@ -243,7 +242,7 @@ export default function SettingsTab({ user, profile, onSignOut, onCurrencyChange
       <div className="mx-4 mb-8">
         <button
           onClick={onSignOut}
-          className="w-full py-4 rounded-2xl font-semibold text-[15px] active:scale-95 transition-all"
+          className="w-full py-4 rounded-2xl font-semibold text-[15px] tap"
           style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}
         >
           Sign out
@@ -258,7 +257,7 @@ function CurrencyChip({ code, active, disabled, onClick }: { code: string; activ
     <button
       onClick={onClick}
       disabled={disabled}
-      className="px-4 py-2 rounded-full text-[13px] font-bold transition-all active:scale-95 disabled:opacity-30"
+      className="px-4 py-2 rounded-full text-[13px] font-bold tap disabled:opacity-30"
       style={active
         ? { background: 'linear-gradient(135deg, var(--accent), var(--accent2))', color: 'white' }
         : { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}

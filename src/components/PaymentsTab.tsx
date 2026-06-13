@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Property, PaymentMilestone } from '@/lib/types'
 import { formatAED, daysUntil } from '@/lib/utils'
+import { useCountUp } from '@/lib/animations'
 
 interface Props { properties: Property[] }
 
@@ -58,7 +59,7 @@ export default function PaymentsTab({ properties }: Props) {
   const activeTotal = activeItems.reduce((s, i) => s + Number(i.amount), 0)
 
   return (
-    <div className="h-full overflow-y-auto scroll-smooth">
+    <div className="h-full overflow-y-auto scroll-smooth anim-tab">
       <div className="px-5" style={{ paddingTop: 'max(env(safe-area-inset-top, 16px), 20px)' }}>
         <p className="text-[11px] font-semibold tracking-widest uppercase mb-1" style={{ color: 'var(--accent2)' }}>Payments</p>
         <h1 className="text-3xl font-bold mb-4" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>Schedule</h1>
@@ -78,7 +79,7 @@ export default function PaymentsTab({ properties }: Props) {
               const isActive = active === b.key
               return (
                 <button key={b.key} onClick={() => setActive(b.key)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-bold whitespace-nowrap flex-shrink-0 tap"
                   style={isActive
                     ? { background: b.color, color: b.key === 'scheduled' ? 'var(--bg)' : 'white' }
                     : { background: 'var(--surface)', color: count ? 'var(--text2)' : 'var(--text4)', border: '1px solid var(--border)' }}>
@@ -95,20 +96,18 @@ export default function PaymentsTab({ properties }: Props) {
           </div>
 
           {/* Active bucket summary */}
-          <div className="mx-4 mt-3 mb-3 p-4 rounded-2xl anim-in" style={{ background: 'var(--surface)', border: `1px solid ${activeMeta.color}30` }}>
+          <div key={active} className="mx-4 mt-3 mb-3 p-4 rounded-2xl anim-pop" style={{ background: 'var(--surface)', border: `1px solid ${activeMeta.color}30` }}>
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: activeMeta.color }}>{activeMeta.label}</p>
                 <p className="text-[12px] leading-snug" style={{ color: 'var(--text4)' }}>{activeMeta.desc}</p>
               </div>
-              <p className="text-xl font-bold flex-shrink-0" style={{ color: activeMeta.color, fontFamily: 'system-ui' }}>
-                {formatAED(activeTotal, true)}
-              </p>
+              <BucketTotal total={activeTotal} color={activeMeta.color} />
             </div>
           </div>
 
           {/* Items */}
-          <div className="mx-4 space-y-2 pb-8">
+          <div key={active} className="mx-4 space-y-2 pb-8">
             {activeItems.length === 0 ? (
               <p className="text-center text-[13px] py-10" style={{ color: 'var(--text4)' }}>
                 Nothing in {activeMeta.label.toLowerCase()} — all clear here.
@@ -165,5 +164,14 @@ function Row({ item: m, bucket, color, index }: { item: Item; bucket: Bucket; co
         <p className="text-[11px] mt-0.5 font-medium" style={{ color, opacity: 0.75 }}>{meta}</p>
       </div>
     </div>
+  )
+}
+
+function BucketTotal({ total, color }: { total: number; color: string }) {
+  const v = useCountUp(total, 700)
+  return (
+    <p className="text-xl font-bold flex-shrink-0" style={{ color, fontFamily: 'system-ui' }}>
+      {formatAED(v, true)}
+    </p>
   )
 }

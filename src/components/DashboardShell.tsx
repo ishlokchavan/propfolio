@@ -123,7 +123,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
         </div>
         {([['portfolio', 'Portfolio'], ['payments', 'Payments'], ['insights', 'Insights'], ['settings', 'Settings']] as Array<[Tab, string]>).map(([tab, label]) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className="text-left px-4 py-3 rounded-xl text-[14px] font-semibold transition-all"
+            className="text-left px-4 py-3 rounded-xl text-[14px] font-semibold transition-all tap-sm"
             style={activeTab === tab
               ? { background: 'var(--surface2)', color: 'var(--accent2)' }
               : { color: 'var(--text3)' }}>
@@ -239,10 +239,11 @@ function NavItem({
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all active:scale-95"
+      className="flex flex-col items-center gap-1 px-4 py-2 rounded-xl tap"
       style={{ color: active ? 'var(--accent2)' : 'var(--text4)', position: 'relative' }}
     >
-      <span style={{ filter: active ? 'drop-shadow(0 0 8px rgba(167,139,250,0.6))' : 'none' }}>
+      <span key={active ? 'on' : 'off'} className={active ? 'nav-pop' : ''}
+        style={{ filter: active ? 'drop-shadow(0 0 8px rgba(167,139,250,0.6))' : 'none' }}>
         {children}
       </span>
       <span className="text-[10px] font-medium">{label}</span>

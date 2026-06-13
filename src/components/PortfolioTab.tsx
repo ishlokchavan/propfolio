@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Property } from '@/lib/types'
-import { formatAED, formatMoney, cashflowByYear, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor, resaleStatus } from '@/lib/utils'
+import { formatAED, formatMoney, paymentProgress, daysUntil, daysLabel, getUrgencyClass, developerColor, resaleStatus } from '@/lib/utils'
+import { useCountUp } from '@/lib/animations'
 import PropertyDetail from './PropertyDetail'
 
 interface Props {
@@ -32,7 +33,7 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
     .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())[0]
 
   return (
-    <div className="h-full overflow-y-auto scroll-smooth">
+    <div className="h-full overflow-y-auto scroll-smooth anim-tab">
       {/* Header */}
       <div
         className="px-5 pt-safe pb-2"
@@ -62,9 +63,7 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
             <p className="text-[11px] font-semibold tracking-wider uppercase mb-2" style={{ color: 'var(--text3)' }}>
               Total Portfolio Value
             </p>
-            <p className="text-4xl font-bold mb-1" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
-              {formatMoney(totalValue, currency.primary, rates)}
-            </p>
+            <HeroValue amount={totalValue} currency={currency.primary} rates={rates} />
             {currency.secondary !== 'none' && formatMoney(totalValue, currency.secondary, rates) && (
               <p className="text-[15px] font-medium mb-3" style={{ color: 'var(--text3)' }}>
                 ≈ {formatMoney(totalValue, currency.secondary, rates)}
@@ -112,7 +111,7 @@ export default function PortfolioTab({ properties, hasAccounts, onConnectClick, 
 function EmptyState({ hasAccounts, onConnectClick }: { hasAccounts: boolean; onConnectClick: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 px-8 py-20 text-center">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 anim-float"
         style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4A4960" strokeWidth="1.5" strokeLinecap="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
@@ -149,7 +148,7 @@ function PropertyCard({ property: p, onClick }: { property: Property; onClick: (
   return (
     <button
       onClick={onClick}
-      className="w-full h-full text-left rounded-[20px] p-5 transition-all active:scale-[0.985] hover:translate-y-[-2px]"
+      className="w-full h-full text-left rounded-[20px] p-5 card-interactive"
       style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
     >
       {/* Identity row */}
@@ -329,7 +328,7 @@ function DueAlert({ properties, currency, rates, onSelect }: { properties: Prope
   return (
     <button
       onClick={() => onSelect(urgent[0].p)}
-      className="w-full text-left mx-4 mt-3 p-4 rounded-2xl active:scale-98 transition-all"
+      className="w-full text-left mx-4 mt-3 p-4 rounded-2xl tap pulse-urgent"
       style={{ width: 'calc(100% - 32px)', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)' }}
     >
       <div className="flex items-center gap-2 mb-1.5">
@@ -346,5 +345,14 @@ function DueAlert({ properties, currency, rates, onSelect }: { properties: Prope
         {urgent.length > 1 ? ` · ${formatMoney(total, currency.primary, rates)} total` : ''}
       </p>
     </button>
+  )
+}
+
+function HeroValue({ amount, currency, rates }: { amount: number; currency: string; rates: Record<string, number> }) {
+  const animated = useCountUp(amount)
+  return (
+    <p className="text-4xl font-bold mb-1" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
+      {formatMoney(animated, currency, rates)}
+    </p>
   )
 }

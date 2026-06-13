@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Property } from '@/lib/types'
 import { formatMoney, cashflowBuckets, CashflowGranularity, monthsUntilHandover, paymentProgress } from '@/lib/utils'
+import { useCountUp } from '@/lib/animations'
 
 interface Props {
   properties: Property[]
@@ -26,7 +27,7 @@ export default function InsightsTab({ properties, currency, rates }: Props) {
   }
 
   return (
-    <div className="h-full overflow-y-auto scroll-smooth">
+    <div className="h-full overflow-y-auto scroll-smooth anim-tab">
       <Header />
       <div className="lg:grid lg:grid-cols-2 lg:gap-3 lg:mx-4 lg:items-start">
         <div>
@@ -76,7 +77,7 @@ function CashflowCard({ properties, currency, rates }: Props) {
       <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: 'var(--surface2)' }}>
         {(['month', 'quarter', 'year'] as CashflowGranularity[]).map(g => (
           <button key={g} onClick={() => setGran(g)}
-            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold capitalize transition-all"
+            className="flex-1 py-1.5 rounded-lg text-[12px] font-bold capitalize transition-all tap-sm"
             style={gran === g
               ? { background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }
               : { color: 'var(--text4)' }}>
@@ -84,12 +85,12 @@ function CashflowCard({ properties, currency, rates }: Props) {
           </button>
         ))}
       </div>
-      <div className="space-y-2.5">
+      <div key={gran} className="space-y-2.5">
         {buckets.map(b => (
           <div key={b.label} className="flex items-center gap-3">
             <span className="text-[11px] font-bold w-14 flex-shrink-0" style={{ color: 'var(--text3)' }}>{b.label}</span>
             <div className="flex-1 h-[18px] rounded-md overflow-hidden" style={{ background: 'var(--track)' }}>
-              <div className="h-full rounded-md transition-all duration-500"
+              <div className="h-full rounded-md anim-bar"
                 style={{ width: `${Math.max(3, (b.total / max) * 100)}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }} />
             </div>
             <span className="text-[12px] font-bold w-[72px] text-right flex-shrink-0" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
@@ -130,10 +131,11 @@ function CompositionCard({ properties, currency, rates }: Props) {
         <div className="relative flex-shrink-0">
           <svg width="136" height="136" viewBox="0 0 136 136">
             <circle cx="68" cy="68" r={R} fill="none" stroke="var(--track)" strokeWidth="16" />
-            {segments.map(s => (
+            {segments.map((s, i) => (
               <circle key={s.dev} cx="68" cy="68" r={R} fill="none" stroke={s.color} strokeWidth="16"
                 strokeDasharray={`${s.dash} ${C - s.dash}`} strokeDashoffset={-s.offset}
-                transform="rotate(-90 68 68)" strokeLinecap="butt" />
+                transform="rotate(-90 68 68)" strokeLinecap="butt"
+                style={{ opacity: 0, animation: `cardIn 0.5s ${0.15 + i * 0.08}s ease forwards` }} />
             ))}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -172,7 +174,7 @@ function EquityCard({ properties, currency, rates }: Props) {
                 <span className="text-[12px] font-bold flex-shrink-0" style={{ color: 'var(--green)' }}>{pct}%</span>
               </div>
               <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--track)' }}>
-                <div className="h-full rounded-full transition-all duration-700"
+                <div className="h-full rounded-full anim-bar"
                   style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--green), var(--green2))' }} />
               </div>
             </div>
