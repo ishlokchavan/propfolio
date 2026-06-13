@@ -135,7 +135,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
       <div className="flex flex-col flex-1 min-w-0" style={{ height: '100dvh' }}>
       {/* Screen content */}
       <div className="flex-1 overflow-hidden relative">
-        <div className={activeTab === 'portfolio' ? 'block h-full' : 'hidden'}>
+        {activeTab === 'portfolio' && <div className="block h-full">
           <PortfolioTab
             properties={localProperties}
             hasAccounts={localAccounts.length > 0}
@@ -143,14 +143,14 @@ export default function DashboardShell({ user, profile, properties, emailAccount
             currency={currency}
             rates={rates}
           />
-        </div>
-        <div className={activeTab === 'payments' ? 'block h-full' : 'hidden'}>
+        </div>}
+        {activeTab === 'payments' && <div className="block h-full">
           <PaymentsTab properties={localProperties} />
-        </div>
-        <div className={activeTab === 'insights' ? 'block h-full' : 'hidden'}>
+        </div>}
+        {activeTab === 'insights' && <div className="block h-full">
           <InsightsTab properties={localProperties} currency={currency} rates={rates} />
-        </div>
-        <div className={activeTab === 'settings' ? 'block h-full' : 'hidden'}>
+        </div>}
+        {activeTab === 'settings' && <div className="block h-full">
           <SettingsTab
             user={user}
             profile={profile}
@@ -169,7 +169,7 @@ export default function DashboardShell({ user, profile, properties, emailAccount
               />
             }
           />
-        </div>
+        </div>}
       </div>
 
       {/* Bottom nav (mobile/tablet) */}

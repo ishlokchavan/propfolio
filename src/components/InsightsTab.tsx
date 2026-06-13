@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Property } from '@/lib/types'
 import { formatMoney, cashflowBuckets, CashflowGranularity, monthsUntilHandover, paymentProgress } from '@/lib/utils'
 import { useCountUp } from '@/lib/animations'
@@ -90,8 +90,7 @@ function CashflowCard({ properties, currency, rates }: Props) {
           <div key={b.label} className="flex items-center gap-3">
             <span className="text-[11px] font-bold w-14 flex-shrink-0" style={{ color: 'var(--text3)' }}>{b.label}</span>
             <div className="flex-1 h-[18px] rounded-md overflow-hidden" style={{ background: 'var(--track)' }}>
-              <div className="h-full rounded-md anim-bar"
-                style={{ width: `${Math.max(3, (b.total / max) * 100)}%`, background: 'linear-gradient(90deg, var(--accent), var(--accent2))' }} />
+              <AnimatedBar pct={Math.max(3, (b.total / max) * 100)} gradient="linear-gradient(90deg, var(--accent), var(--accent2))" />
             </div>
             <span className="text-[12px] font-bold w-[72px] text-right flex-shrink-0" style={{ color: 'var(--text)', fontFamily: 'system-ui' }}>
               {formatMoney(b.total, currency.primary, rates)}
@@ -132,10 +131,7 @@ function CompositionCard({ properties, currency, rates }: Props) {
           <svg width="136" height="136" viewBox="0 0 136 136">
             <circle cx="68" cy="68" r={R} fill="none" stroke="var(--track)" strokeWidth="16" />
             {segments.map((s, i) => (
-              <circle key={s.dev} cx="68" cy="68" r={R} fill="none" stroke={s.color} strokeWidth="16"
-                strokeDasharray={`${s.dash} ${C - s.dash}`} strokeDashoffset={-s.offset}
-                transform="rotate(-90 68 68)" strokeLinecap="butt"
-                style={{ opacity: 0, animation: `cardIn 0.5s ${0.15 + i * 0.08}s ease forwards` }} />
+              <DonutSeg key={s.dev} cx={68} cy={68} r={R} color={s.color} dash={s.dash} gap={C - s.dash} offset={s.offset} delay={0.12 + i * 0.1} />
             ))}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -174,8 +170,7 @@ function EquityCard({ properties, currency, rates }: Props) {
                 <span className="text-[12px] font-bold flex-shrink-0" style={{ color: 'var(--green)' }}>{pct}%</span>
               </div>
               <div className="h-2 rounded-full overflow-hidden flex" style={{ background: 'var(--track)' }}>
-                <div className="h-full rounded-full anim-bar"
-                  style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--green), var(--green2))' }} />
+                <AnimatedBar pct={pct} gradient="linear-gradient(90deg, var(--green), var(--green2))" rounded />
               </div>
             </div>
           )
@@ -220,5 +215,28 @@ function HandoverCard({ properties }: { properties: Property[] }) {
         ))}
       </div>
     </Card>
+  )
+}
+
+function AnimatedBar({ pct, gradient, rounded }: { pct: number; gradient: string; rounded?: boolean }) {
+  const [w, setW] = useState(0)
+  useEffect(() => {
+    const t = setTimeout(() => setW(pct), 60)
+    return () => clearTimeout(t)
+  }, [pct])
+  return (
+    <div className={`h-full ${rounded ? 'rounded-full' : 'rounded-md'}`}
+      style={{ width: `${w}%`, background: gradient, transition: 'width 0.9s cubic-bezier(0.22,1,0.36,1)' }} />
+  )
+}
+
+function DonutSeg({ cx, cy, r, color, dash, gap, offset, delay }: { cx: number; cy: number; r: number; color: string; dash: number; gap: number; offset: number; delay: number }) {
+  const [draw, setDraw] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setDraw(true), delay * 1000); return () => clearTimeout(t) }, [delay])
+  return (
+    <circle cx={cx} cy={cy} r={r} fill="none" stroke={color} strokeWidth="16"
+      strokeDasharray={`${draw ? dash : 0} ${draw ? gap : dash + gap}`} strokeDashoffset={-offset}
+      transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt"
+      style={{ transition: 'stroke-dasharray 0.8s cubic-bezier(0.22,1,0.36,1)' }} />
   )
 }
