@@ -326,88 +326,80 @@ ${digest}`
   }
 }
 
-// ── Claude parsing with PDF support ──
+// ── Extraction with Gemini 1.5 Pro (free tier, 50 req/day) ──
 async function parseWithClaude(
   emails: Array<{ subject: string; from: string; date: string; body: string }>,
   pdfs: Array<{ name: string; data: string }>
 ): Promise<ParsedProperty[]> {
+  const today = new Date().toISOString().slice(0, 10)
   const digest = emails.map((e, i) =>
     `--- EMAIL ${i + 1} ---\nFrom: ${e.from}\nSubject: ${e.subject}\nDate: ${e.date}\nBody: ${e.body}`
   ).join('\n\n')
 
-  const content: Array<Record<string, unknown>> = []
-  for (const pdf of pdfs) {
-    content.push({
-      type: 'document',
-      source: { type: 'base64', media_type: 'application/pdf', data: pdf.data },
-    })
-  }
-  content.push({
-    type: 'text',
-    text: `You are an expert at extracting UAE real estate ownership data from developer emails and attached PDF documents (payment plans, SOAs, booking forms, receipts).
+  const prompt = `You are an expert at extracting UAE real estate ownership data from developer emails and PDF documents (payment plans, SOAs, booking forms, receipts).
 
-Today's date: ${new Date().toISOString().slice(0, 10)}
+Today: ${today}
 
-Extract every distinct PROPERTY this buyer OWNS from the emails below and any attached PDFs. PDFs are the highest-quality source — payment plan tables in PDFs override amounts mentioned in email text.
+Extract every distinct PROPERTY this buyer OWNS. PDFs override email text for amounts.
 
 Rules:
-- One unique unit = one property. Merge information about the same unit from multiple emails into ONE entry.
-- Amounts in AED as plain numbers: "1.85M" → 1850000, "AED 185,000" → 185000.
-- Milestone status relative to today: "paid" if a receipt/confirmation exists OR the due date passed and a later payment was made; "due" if due within 60 days or overdue with no payment evidence; "future" otherwise.
-- due_date as YYYY-MM-DD when exact, else null with due_label ("Q4 2026", "On Completion").
-- Include DLD fees / admin fees / Oqood charges as milestones if they appear in payment plans.
-- paid_amount = sum of milestones marked paid.
-- SKIP marketing, newsletters, price lists, launch announcements — only properties with booking confirmations, SPAs, payment plans, receipts, or statements of account.
-- confidence 0.0-1.0 that this is a genuinely owned unit.
+- One unit = one property. Merge multiple emails about the same unit.
+- Amounts in AED as numbers: "1.85M"=1850000, "AED 185,000"=185000.
+- Milestone status vs today: "paid" if receipt exists OR due date passed with later payment made; "due" if due within 60 days with no payment; "future" otherwise.
+- due_date as YYYY-MM-DD when exact, else null + due_label like "Q4 2026".
+- paid_amount = sum of paid milestones.
+- SKIP marketing, newsletters, price lists. Only booking confirmations, SPAs, payment plans, receipts, SOAs.
+- confidence: 0.0-1.0 certainty this is a genuinely owned unit.
 
-Respond ONLY with valid JSON, no markdown fences:
-{"properties": [{"project_name": "...", "developer": "...", "unit_number": "..." or null, "property_type": "Apartment 2BR" or null, "location": "..." or null, "emirate": "Dubai", "total_value": 0, "paid_amount": 0, "handover_date": "..." or null, "ownership_names": [], "milestones": [{"label": "...", "amount": 0, "due_date": null, "due_label": null, "status": "paid"}], "confidence": 0.9}]}
+Respond ONLY with valid JSON, no markdown:
+{"properties": [{"project_name": "...","developer": "...","unit_number": null,"property_type": null,"location": null,"emirate": "Dubai","total_value": 0,"paid_amount": 0,"handover_date": null,"ownership_names": [],"milestones": [{"label": "...","amount": 0,"due_date": null,"due_label": null,"status": "paid"}],"confidence": 0.9}]}
 
-If none: {"properties": []}
+If none found: {"properties": []}
 
 EMAILS:
-${digest}`,
-  })
+${digest}`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  // Build Gemini parts: inline PDFs as base64 + text prompt
+  const parts: Array<Record<string, unknown>> = []
+  for (const pdf of pdfs) {
+    parts.push({
+      inline_data: { mime_type: 'application/pdf', data: pdf.data }
+    })
+  }
+  parts.push({ text: prompt })
+
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`
+  const res = await fetch(geminiUrl, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
-      messages: [{ role: 'user', content }],
+      contents: [{ parts }],
+      generationConfig: { temperature: 0, maxOutputTokens: 8192 },
     }),
   })
 
   if (!res.ok) {
     const errText = await res.text()
-    // A bad/locked PDF slipped through — retry this batch without attachments rather than failing
-    if (res.status === 400 && pdfs.length > 0 && /pdf/i.test(errText)) {
+    // Retry without PDFs if PDF caused the error
+    if ((res.status === 400 || res.status === 413) && pdfs.length > 0) {
       return parseWithClaude(emails, [])
     }
+    // Gemini rate limit (429) — surface as rate_limited for client backoff
     if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10)
       const e = new Error('rate_limited') as Error & { rateLimited: boolean; retryAfter: number }
       e.rateLimited = true
-      e.retryAfter = Math.min(Math.max(retryAfter, 15), 90)
+      e.retryAfter = 30
       throw e
     }
-    throw new Error(`AI parsing failed: ${res.status} ${errText.slice(0, 150)}`)
+    console.error('[parse] Gemini error', res.status, errText.slice(0, 200))
+    return [] // soft fail — don't crash the whole sync
   }
-  const data = await res.json()
-  const raw = (data.content || [])
-    .filter((b: { type: string }) => b.type === 'text')
-    .map((b: { text: string }) => b.text)
-    .join('')
-    .replace(/```json|```/g, '')
-    .trim()
 
+  const data = await res.json()
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const cleaned = raw.replace(/```json|```/g, '').trim()
   try {
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(cleaned)
     return parsed.properties || []
   } catch {
     return []
