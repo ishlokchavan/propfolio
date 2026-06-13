@@ -281,53 +281,47 @@ async function finishJob(supabase: Awaited<ReturnType<typeof createClient>>, job
 }
 
 
-// ── Stage 1: cheap fast triage with Haiku ──
+// ── Stage 1: triage with Gemini Flash (free tier) ──
 async function triageEmails(emails: EmailItem[]): Promise<boolean[]> {
   if (emails.length === 0) return []
   const digest = emails.map((e, i) =>
     `${i + 1}. From: ${e.from} | Subject: ${e.subject} | Snippet: ${e.body.slice(0, 200)}`
   ).join('\n')
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5',
-      max_tokens: 200,
-      messages: [{
-        role: 'user',
-        content: `These are emails from a UAE property buyer's inbox. Which are OWNERSHIP documents (booking confirmations, SPAs, payment plans, payment receipts/reminders, statements of account, handover notices for a SPECIFIC purchased unit)? Marketing, newsletters, launch announcements, price lists are NOT.
+  const prompt = `You are helping filter a UAE property buyer's inbox. Which of these emails are OWNERSHIP documents — booking confirmations, SPAs, payment plans, payment receipts, payment reminders, statements of account, handover notices for a specific purchased unit? Exclude marketing emails, newsletters, launch announcements, and price lists.
 
-Respond ONLY with a JSON array of the numbers that ARE ownership documents, e.g. [2,5,9]. If none: []
+Respond ONLY with a JSON array of the email numbers that ARE ownership documents, e.g. [2,5,9]. If none match: []
 
-${digest}`,
-      }],
-    }),
-  })
+${digest}`
 
-  if (!res.ok) {
-    if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') || '60', 10)
-      const e = new Error('rate_limited') as Error & { rateLimited: boolean; retryAfter: number }
-      e.rateLimited = true
-      e.retryAfter = Math.min(Math.max(retryAfter, 15), 90)
-      throw e
-    }
-    // Triage failure should never block the pipeline — treat all as relevant
-    return emails.map(() => true)
-  }
-
-  const data = await res.json()
-  const raw = (data.content || []).filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('').trim()
   try {
-    const nums: number[] = JSON.parse(raw.replace(/```json|```/g, ''))
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
+    const res = await fetch(
+      geminiUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 256 },
+        }),
+      }
+    )
+
+    if (!res.ok) {
+      // Gemini failure — fall back to treating all emails as relevant rather than blocking
+      console.warn('[triage] Gemini error', res.status)
+      return emails.map(() => true)
+    }
+
+    const data = await res.json()
+    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const cleaned = raw.replace(/```json|```/g, '').trim()
+    const nums: number[] = JSON.parse(cleaned)
     const set = new Set(nums)
     return emails.map((_, i) => set.has(i + 1))
   } catch {
+    // On any parse/network failure, keep all emails (safe default)
     return emails.map(() => true)
   }
 }
