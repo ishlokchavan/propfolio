@@ -25,41 +25,32 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
   async function connectGoogle() {
     setConnecting('google')
+    // Use signInWithOAuth — re-authenticates and captures fresh Gmail token.
+    // This works for both first-time connect and token refresh.
+    // linkIdentity is only needed when adding a DIFFERENT email account.
     localStorage.setItem('pf_link_provider', 'google')
-    // linkIdentity attaches another mailbox to the CURRENT account
-    // (signInWithOAuth would switch users)
-    const { error } = await supabase.auth.linkIdentity({
+    await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${location.origin}/auth/callback?link=google`,
+        redirectTo: `${location.origin}/auth/callback`,
         scopes: 'https://www.googleapis.com/auth/gmail.readonly',
         queryParams: { access_type: 'offline', prompt: 'consent' },
       },
     })
-    if (error) {
-      setSyncLog([{ text: error.message.includes('disabled')
-        ? 'Enable "Allow manual account linking" in Supabase → Auth → Settings, then try again.'
-        : error.message, type: 'error' }])
-      setConnecting(null)
-    }
+    setConnecting(null)
   }
 
   async function connectMicrosoft() {
     setConnecting('microsoft')
     localStorage.setItem('pf_link_provider', 'azure')
-    const { error } = await supabase.auth.linkIdentity({
+    await supabase.auth.signInWithOAuth({
       provider: 'azure',
       options: {
-        redirectTo: `${location.origin}/auth/callback?link=azure`,
+        redirectTo: `${location.origin}/auth/callback`,
         scopes: 'openid email profile offline_access https://graph.microsoft.com/Mail.Read',
       },
     })
-    if (error) {
-      setSyncLog([{ text: error.message.includes('disabled')
-        ? 'Enable "Allow manual account linking" in Supabase → Auth → Settings, then try again.'
-        : error.message, type: 'error' }])
-      setConnecting(null)
-    }
+    setConnecting(null)
   }
 
   async function removeAccount(id: string) {
