@@ -41,6 +41,11 @@ export default function PaymentsTab({ properties }: Props) {
     g.due.sort((a, b) => (a.days ?? 99) - (b.days ?? 99))
     g.upcoming.sort((a, b) => (a.days ?? 99) - (b.days ?? 99))
     g.scheduled.sort((a, b) => (a.days ?? 9999) - (b.days ?? 9999))
+    const paidTime = (m: Item) => {
+      const d = m.paid_date || m.due_date
+      return d ? new Date(d).getTime() : 0
+    }
+    g.paid.sort((a, b) => paidTime(b) - paidTime(a)) // latest first
     return g
   }, [items])
 
