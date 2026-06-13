@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 export const maxDuration = 60
 
 const BATCH_SIZE = 16
-const MAX_EMAILS = 200
+const MAX_EMAILS = 2000  // no artificial cap — incremental sync handles cost
 const MAX_PDFS_PER_BATCH = 2
 const MAX_PDF_BYTES = 4 * 1024 * 1024
 
@@ -368,7 +368,7 @@ ${digest}`
   }
   parts.push({ text: prompt })
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${process.env.GEMINI_API_KEY}`
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
   const res = await fetch(geminiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -391,17 +391,39 @@ ${digest}`
       e.retryAfter = 30
       throw e
     }
-    console.error('[parse] Gemini error', res.status, errText.slice(0, 200))
+    console.error('[parse] Gemini extraction error', res.status, errText.slice(0, 300))
     return [] // soft fail — don't crash the whole sync
   }
 
   const data = await res.json()
-  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const cleaned = raw.replace(/```json|```/g, '').trim()
+
+  // Check for safety blocks or empty candidates
+  if (!data.candidates?.length) {
+    console.warn('[parse] Gemini returned no candidates:', JSON.stringify(data).slice(0, 300))
+    return []
+  }
+  if (data.candidates[0].finishReason === 'SAFETY') {
+    console.warn('[parse] Gemini blocked by safety filters')
+    return []
+  }
+
+  const raw = data.candidates[0]?.content?.parts?.[0]?.text || ''
+  if (!raw) {
+    console.warn('[parse] Gemini empty text response')
+    return []
+  }
+
+  // Strip markdown fences and extract JSON
+  const cleaned = raw.replace(/```json\n?|```/g, '').trim()
+  const jsonStart = cleaned.indexOf('{')
+  const jsonEnd = cleaned.lastIndexOf('}')
+  const jsonStr = jsonStart >= 0 && jsonEnd > jsonStart ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned
+
   try {
-    const parsed = JSON.parse(cleaned)
+    const parsed = JSON.parse(jsonStr)
     return parsed.properties || []
-  } catch {
+  } catch (e) {
+    console.error('[parse] JSON parse failed, raw:', raw.slice(0, 300))
     return []
   }
 }
