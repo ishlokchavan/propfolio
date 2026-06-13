@@ -25,9 +25,31 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
   async function connectGoogle() {
     setConnecting('google')
-    // Use signInWithOAuth — re-authenticates and captures fresh Gmail token.
-    // This works for both first-time connect and token refresh.
-    // linkIdentity is only needed when adding a DIFFERENT email account.
+
+    // Step 1: check if the current session already has a Gmail token
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.provider_token && session.user.app_metadata.provider === 'google') {
+      // Token already present — just store it
+      const { data, error } = await supabase.from('email_accounts').upsert({
+        user_id: session.user.id,
+        provider: 'google',
+        email: session.user.email!,
+        access_token: session.provider_token,
+        refresh_token: session.provider_refresh_token || null,
+        token_expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+        sync_status: 'pending',
+      }, { onConflict: 'user_id,email' }).select().single()
+      if (!error && data) {
+        onAccountAdded(data)
+        setSyncLog([{ text: 'Gmail connected — tap ↻ to sync', type: 'found' }])
+      } else {
+        setSyncLog([{ text: 'Could not save account. Try signing out and back in.', type: 'error' }])
+      }
+      setConnecting(null)
+      return
+    }
+
+    // Step 2: no token in session — do a full re-auth to get one
     localStorage.setItem('pf_link_provider', 'google')
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -42,6 +64,26 @@ export default function ConnectTab({ user, accounts, onAccountAdded, onAccountRe
 
   async function connectMicrosoft() {
     setConnecting('microsoft')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.provider_token && session.user.app_metadata.provider === 'azure') {
+      const { data, error } = await supabase.from('email_accounts').upsert({
+        user_id: session.user.id,
+        provider: 'microsoft',
+        email: session.user.email!,
+        access_token: session.provider_token,
+        refresh_token: session.provider_refresh_token || null,
+        token_expires_at: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+        sync_status: 'pending',
+      }, { onConflict: 'user_id,email' }).select().single()
+      if (!error && data) {
+        onAccountAdded(data)
+        setSyncLog([{ text: 'Outlook connected — tap ↻ to sync', type: 'found' }])
+      } else {
+        setSyncLog([{ text: 'Could not save account. Try signing out and back in.', type: 'error' }])
+      }
+      setConnecting(null)
+      return
+    }
     localStorage.setItem('pf_link_provider', 'azure')
     await supabase.auth.signInWithOAuth({
       provider: 'azure',
