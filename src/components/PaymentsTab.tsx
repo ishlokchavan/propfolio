@@ -95,10 +95,10 @@ export default function PaymentsTab({ properties }: Props) {
             })}
           </div>
 
-          {/* Active bucket summary */}
+          {/* Active bucket summary — only the selected bucket */}
           <div key={active} className="mx-4 mt-3 mb-3 p-4 rounded-2xl anim-pop" style={{ background: 'var(--surface)', border: `1px solid ${activeMeta.color}30` }}>
             <div className="flex items-end justify-between gap-3">
-              <div>
+              <div className="flex-1 min-w-0 pr-3">
                 <p className="text-[12px] font-bold uppercase tracking-wider mb-1" style={{ color: activeMeta.color }}>{activeMeta.label}</p>
                 <p className="text-[12px] leading-snug" style={{ color: 'var(--text4)' }}>{activeMeta.desc}</p>
               </div>
